@@ -17,4 +17,15 @@ public class UserService {
         User user = new User();
         return userDto;
     }
+
+    public UserDto getUserByEmail(String email) {
+        User user = this.userRepository.findByEmail(email).orElseThrow(() -> new RuntimeException("No user found"));
+        return UserDto.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .createdAt(user.getCreatedAt())
+                .lastLogin(user.getLastLogin())
+                .lastName(user.getLastName())
+                .build();
+    }
 }

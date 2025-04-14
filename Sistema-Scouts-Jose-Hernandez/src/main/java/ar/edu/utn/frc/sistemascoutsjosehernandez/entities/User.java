@@ -90,4 +90,6 @@ public class User implements UserDetails {
     @OneToMany(mappedBy = "user", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     private List<RolesXUser> rolesXUser = new ArrayList<>();
 
+    public Integer getUserId(){return id;}
+
 }

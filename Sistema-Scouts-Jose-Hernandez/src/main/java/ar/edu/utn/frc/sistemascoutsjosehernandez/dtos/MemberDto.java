@@ -20,7 +20,7 @@ public class MemberDto {
     private String lastName;
     private String dni;
     private String section;
-    private LocalDate birthDate;
+    private LocalDate birthdate;
     private String notes;
     private List<RelationshipDto> relationships;
     private BigDecimal accountBalance;
