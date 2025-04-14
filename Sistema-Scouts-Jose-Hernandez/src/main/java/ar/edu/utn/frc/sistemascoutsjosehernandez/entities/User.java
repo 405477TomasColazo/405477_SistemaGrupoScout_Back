@@ -6,11 +6,14 @@ import jakarta.validation.constraints.Size;
 import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Getter
 @Setter
@@ -52,7 +55,9 @@ public class User implements UserDetails {
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of();
+        return rolesXUser.stream()
+                .map(rx -> new SimpleGrantedAuthority(rx.getRole().getDescription()))
+                .collect(Collectors.toList());
     }
 
     @Id
@@ -81,5 +86,8 @@ public class User implements UserDetails {
 
     @Column(name = "last_login")
     private Instant lastLogin;
+
+    @OneToMany(mappedBy = "user", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
+    private List<RolesXUser> rolesXUser = new ArrayList<>();
 
 }
