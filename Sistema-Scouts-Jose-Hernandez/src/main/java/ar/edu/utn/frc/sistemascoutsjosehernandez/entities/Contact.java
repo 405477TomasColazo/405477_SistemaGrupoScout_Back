@@ -12,13 +12,14 @@ import lombok.Setter;
 @Table(name = "contacts", schema = "jose_hernandez_db")
 public class Contact {
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
     private Integer id;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "tutor_id", nullable = false)
-    private Tutor tutor;
+    private Member tutor;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

@@ -12,6 +12,7 @@ import lombok.Setter;
 @Table(name = "badge_categories", schema = "jose_hernandez_db")
 public class BadgeCategory {
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false)
     private Integer id;
 

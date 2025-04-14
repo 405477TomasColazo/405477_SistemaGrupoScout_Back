@@ -28,6 +28,17 @@ public class Member {
     @JoinColumn(name = "member_type_id", nullable = false)
     private MemberType memberType;
 
+    @Column(name = "is_tutor")
+    private Boolean isTutor = false;
+
+    @Size(max = 50)
+    @Column(name = "contact_phone", length = 50)
+    private String contactPhone;
+
+    @Size(max = 100)
+    @Column(name = "email", length = 100)
+    private String email;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "section_id")
     private Section section;
