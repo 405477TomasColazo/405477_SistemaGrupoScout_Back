@@ -25,4 +25,5 @@ public class MemberDto {
     private List<RelationshipDto> relationships;
     private BigDecimal accountBalance;
     private String memberType;
+    private String address;
 }

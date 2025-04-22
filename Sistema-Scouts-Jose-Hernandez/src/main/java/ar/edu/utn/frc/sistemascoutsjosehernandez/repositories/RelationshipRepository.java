@@ -9,4 +9,5 @@ import java.util.List;
 @Repository
 public interface RelationshipRepository extends JpaRepository<Relationship, Integer> {
     List<Relationship> findAllByMember_Id(int id);
+    List<Relationship> findAllByTutor_Id(int id);
 }

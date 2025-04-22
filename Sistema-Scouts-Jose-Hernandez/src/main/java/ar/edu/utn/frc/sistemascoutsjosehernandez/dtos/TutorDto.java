@@ -21,6 +21,8 @@ public class TutorDto {
     private String lastName;
     private LocalDate birthdate;
     private String dni;
+    private String address;
     private String notes;
     private List<RelationshipDto> relationships;
+
 }

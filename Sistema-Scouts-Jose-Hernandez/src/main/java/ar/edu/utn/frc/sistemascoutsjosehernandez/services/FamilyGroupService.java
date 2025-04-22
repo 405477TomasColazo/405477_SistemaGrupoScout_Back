@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +25,7 @@ public class FamilyGroupService {
     private final RelationshipRepository relationshipRepository;
     private final MemberTypeRepository memberTypeRepository;
     private final StatusRepository statusRepository;
+    private final MemberService memberService;
 
     @Transactional
     public FamilyGroup newFamilyGroup(TutorDto tutor){
@@ -43,6 +45,7 @@ public class FamilyGroupService {
         Member mainContact = new Member();
         mainContact.setFamilyGroup(familyGroup);
         mainContact.setUser(user);
+        mainContact.setAddress(tutor.getAddress());
         mainContact.setContactPhone(tutor.getContactPhone());
         mainContact.setEmail(tutor.getEmail());
         mainContact.setDni(mainContact.getDni());
@@ -91,6 +94,7 @@ public class FamilyGroupService {
         MemberType type = memberTypeRepository.findFirstByDescription("PROTAGONISTA");
         Member protagonist = new Member();
         protagonist.setFamilyGroup(familyGroup);
+        protagonist.setAddress(member.getAddress());
         protagonist.setBirthdate(member.getBirthdate());
         protagonist.setDni(member.getDni());
         protagonist.setName(member.getName());
@@ -112,6 +116,7 @@ public class FamilyGroupService {
         tutorContact.setFamilyGroup(familyGroup);
         tutorContact.setIsTutor(true);
         tutorContact.setContactPhone(tutor.getContactPhone());
+        tutorContact.setAddress(tutor.getAddress());
         tutorContact.setEmail(tutor.getEmail());
         tutorContact.setDni(tutor.getDni());
         tutorContact.setName(tutor.getName());
@@ -121,33 +126,33 @@ public class FamilyGroupService {
         tutorContact.setBirthdate(tutor.getBirthdate());
         return tutorContact;
     }
-    @Transactional
-    public FamilyGroup updateTutor(TutorDto tutorDto){
-        Member tutor = memberRepository.findById(tutorDto.getId()).orElseThrow(()-> new RuntimeException("Tutor not found"));
-        tutor.setName(tutorDto.getName());
-        tutor.setLastname(tutorDto.getLastName());
-        tutor.setNotes(tutorDto.getNotes());
-        tutor.setDni(tutorDto.getDni());
-        tutor.setContactPhone(tutorDto.getContactPhone());
-        tutor.setEmail(tutorDto.getEmail());
-        tutor.setBirthdate(tutorDto.getBirthdate());
-        tutor = memberRepository.save(tutor);
-        return tutor.getFamilyGroup();
-    }
-    @Transactional
-    public  FamilyGroup updateMember(MemberDto memberDto){
-        Member member =memberRepository.findById(memberDto.getId()).orElseThrow(()-> new RuntimeException("Member not found"));
-        Section section = sectionRepository.findFirstByDescription(memberDto.getSection());
-        if (section == null) {throw new RuntimeException("Section not found");}
-        member.setSection(section);
-        member.setNotes(memberDto.getNotes());
-        member.setDni(memberDto.getDni());
-        member.setName(memberDto.getName());
-        member.setLastname(memberDto.getLastName());
-        member.setBirthdate(memberDto.getBirthdate());
-        member = memberRepository.save(member);
-        return member.getFamilyGroup();
-    }
+//    @Transactional
+//    public FamilyGroup updateTutor(TutorDto tutorDto){
+//        Member tutor = memberRepository.findById(tutorDto.getId()).orElseThrow(()-> new RuntimeException("Tutor not found"));
+//        tutor.setName(tutorDto.getName());
+//        tutor.setLastname(tutorDto.getLastName());
+//        tutor.setNotes(tutorDto.getNotes());
+//        tutor.setDni(tutorDto.getDni());
+//        tutor.setContactPhone(tutorDto.getContactPhone());
+//        tutor.setEmail(tutorDto.getEmail());
+//        tutor.setBirthdate(tutorDto.getBirthdate());
+//        tutor = memberRepository.save(tutor);
+//        return tutor.getFamilyGroup();
+//    }
+//    @Transactional
+//    public  FamilyGroup updateMember(MemberDto memberDto){
+//        Member member =memberRepository.findById(memberDto.getId()).orElseThrow(()-> new RuntimeException("Member not found"));
+//        Section section = sectionRepository.findFirstByDescription(memberDto.getSection());
+//        if (section == null) {throw new RuntimeException("Section not found");}
+//        member.setSection(section);
+//        member.setNotes(memberDto.getNotes());
+//        member.setDni(memberDto.getDni());
+//        member.setName(memberDto.getName());
+//        member.setLastname(memberDto.getLastName());
+//        member.setBirthdate(memberDto.getBirthdate());
+//        member = memberRepository.save(member);
+//        return member.getFamilyGroup();
+//    }
 
     public FamilyGroupDto getFamilyGroup(Integer userId){
         FamilyGroup familyGroup = familyGroupRepository.findFamilyGroupsByUser_Id(userId);
@@ -160,21 +165,24 @@ public class FamilyGroupService {
         for (Member member : familyGroup.getMemberProtagonists()) {
             members.add(toMemberDto(member));
         }
-        return FamilyGroupDto
+         FamilyGroupDto x= FamilyGroupDto
                 .builder()
                 .id(familyGroup.getId())
                 .mainContact(toTutorDto(familyGroup.getMainContact()))
                 .members(members)
                 .tutors(tutors)
                 .build();
+
+        return x;
     }
 
     private TutorDto toTutorDto(Member member){
         if (!member.getIsTutor()){throw new RuntimeException("Member is not a tutor");}
-        List<Relationship> relationships = relationshipRepository.findAllByMember_Id(member.getId());
+        List<Relationship> relationships = relationshipRepository.findAllByTutor_Id(member.getId());
         List<RelationshipDto> relations = new ArrayList<>();
         for (Relationship relationship : relationships) {
             RelationshipDto r = RelationshipDto.builder()
+                    .id(relationship.getId())
                     .tutorId(relationship.getTutor().getId())
                     .memberId(relationship.getMember().getId())
                     .relationship(relationship.getRelationship())
@@ -187,6 +195,7 @@ public class FamilyGroupService {
                 .lastName(member.getLastname())
                 .notes(member.getNotes())
                 .dni(member.getDni())
+                .address(member.getAddress())
                 .birthdate(member.getBirthdate())
                 .contactPhone(member.getContactPhone())
                 .email(member.getEmail())
@@ -201,6 +210,7 @@ public class FamilyGroupService {
         List<RelationshipDto> relations = new ArrayList<>();
         for (Relationship relationship : relationships) {
             RelationshipDto r = RelationshipDto.builder()
+                    .id(relationship.getId())
                     .tutorId(relationship.getTutor().getId())
                     .memberId(relationship.getMember().getId())
                     .relationship(relationship.getRelationship())
@@ -211,6 +221,7 @@ public class FamilyGroupService {
                 .id(member.getId())
                 .name(member.getName())
                 .lastName(member.getLastname())
+                .address(member.getAddress())
                 .notes(member.getNotes())
                 .dni(member.getDni())
                 .accountBalance(member.getAccountBalance())
@@ -232,6 +243,22 @@ public class FamilyGroupService {
         relationship.setMember(protagonist);
         relationship.setRelationship(relationshipDto.getRelationship());
         relationship = relationshipRepository.save(relationship);
+        return relationshipDto;
+    }
+
+    public TutorDto updateTutor(TutorDto tutorDto, Integer userId){
+        return toTutorDto(memberService.updateMember(tutorDto, userId));
+    }
+
+    public MemberDto updateMember(MemberDto memberDto, Integer userId){
+        return toMemberDto(memberService.updateMember(memberDto, userId));
+    }
+
+    public RelationshipDto updateRelationship(RelationshipDto relationshipDto, Integer id){
+        if (!Objects.equals(relationshipDto.getId(), id)){throw new RuntimeException("ids do not match");}
+        Relationship relationship = relationshipRepository.findById(id).orElseThrow(()-> new RuntimeException("Relationship not found"));
+        relationship.setRelationship(relationshipDto.getRelationship());
+        relationshipRepository.save(relationship);
         return relationshipDto;
     }
 }

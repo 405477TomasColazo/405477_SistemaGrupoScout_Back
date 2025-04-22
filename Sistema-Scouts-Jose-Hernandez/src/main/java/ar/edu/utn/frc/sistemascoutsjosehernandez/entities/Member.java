@@ -64,6 +64,11 @@ public class Member {
     @Column(name = "lastname", nullable = false, length = 100)
     private String lastname;
 
+    @Size(max = 100)
+    @NotNull
+    @Column(name = "address",nullable = false,length = 100)
+    private String address;
+
     @NotNull
     @Column(name = "birthdate", nullable = false)
     private LocalDate birthdate;

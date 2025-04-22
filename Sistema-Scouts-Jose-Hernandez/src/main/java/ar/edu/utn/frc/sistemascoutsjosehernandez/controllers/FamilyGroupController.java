@@ -39,4 +39,22 @@ public class FamilyGroupController {
     public ResponseEntity<RelationshipDto> addRelationshipToFamilyGroup(@RequestBody RelationshipDto relationship) {
         return ResponseEntity.ok(familyGroupService.addRelationship(relationship));
     }
+
+    @PutMapping("/tutor/{id}")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<TutorDto> updateTutor(@PathVariable Integer id, @RequestBody TutorDto tutor) {
+        return ResponseEntity.ok(familyGroupService.updateTutor(tutor, id));
+    }
+
+    @PutMapping("/member/{id}")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<MemberDto> updateMember(@PathVariable Integer id, @RequestBody MemberDto member) {
+        return ResponseEntity.ok(familyGroupService.updateMember(member, id));
+    }
+
+    @PutMapping("/relationShip/{id}")
+    @PreAuthorize("hasAnyRole('USER','ADMIN')")
+    public ResponseEntity<RelationshipDto> updateRelationship(@PathVariable Integer id, @RequestBody RelationshipDto relationship) {
+        return ResponseEntity.ok(familyGroupService.updateRelationship(relationship, id));
+    }
 }
