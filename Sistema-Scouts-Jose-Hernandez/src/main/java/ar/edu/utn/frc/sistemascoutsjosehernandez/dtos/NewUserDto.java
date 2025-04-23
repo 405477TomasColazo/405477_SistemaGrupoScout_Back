@@ -1,6 +1,5 @@
-package ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.auth;
+package ar.edu.utn.frc.sistemascoutsjosehernandez.dtos;
 
-import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.TutorDto;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,9 +9,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class RegisterRequest {
+public class NewUserDto {
     private String email;
-    private String password;
     private String lastName;
-    private TutorDto tutor;
 }

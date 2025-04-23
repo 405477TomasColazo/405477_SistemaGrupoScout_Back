@@ -35,6 +35,30 @@ public class JwtService {
         return getToken(extraClaims, user);
     }
 
+    public String generateInvitationToken(String email) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("type", "INVITATION");
+
+        return Jwts.builder()
+                .setClaims(claims)
+                .setSubject(email)
+                .setIssuedAt(new Date())
+                .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 72)) // 72hs
+                .signWith(getKey(), SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public boolean isInvitationTokenValid(String token) {
+        try {
+            Claims claims = getClaimsFromToken(token);
+            String type = (String) claims.get("type");
+
+            return "INVITATION".equals(type) && !isTokenExpired(token);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     private String getToken(Map<String, Object> extraClaims, UserDetails user) {
         return Jwts.builder()
                 .setClaims(extraClaims)

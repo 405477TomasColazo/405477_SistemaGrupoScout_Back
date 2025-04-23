@@ -2,12 +2,14 @@ package ar.edu.utn.frc.sistemascoutsjosehernandez.entities;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 @Getter
 @Setter
 @Entity
+@AllArgsConstructor
+@NoArgsConstructor
+@Builder
 @Table(name = "roles_x_users", schema = "jose_hernandez_db")
 public class RolesXUser {
     @Id
