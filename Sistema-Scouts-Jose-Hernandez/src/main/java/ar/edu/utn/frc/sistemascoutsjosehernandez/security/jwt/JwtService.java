@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.sistemascoutsjosehernandez.security.jwt;
 
 
+import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.NewUserDto;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -35,13 +36,14 @@ public class JwtService {
         return getToken(extraClaims, user);
     }
 
-    public String generateInvitationToken(String email) {
+    public String generateInvitationToken(NewUserDto userDto) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("type", "INVITATION");
+        claims.put("lastName", userDto.getLastName());
 
         return Jwts.builder()
                 .setClaims(claims)
-                .setSubject(email)
+                .setSubject(userDto.getEmail())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + 1000 * 60 * 60 * 72)) // 72hs
                 .signWith(getKey(), SignatureAlgorithm.HS256)

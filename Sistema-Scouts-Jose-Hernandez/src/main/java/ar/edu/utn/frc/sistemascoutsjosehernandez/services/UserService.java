@@ -8,6 +8,7 @@ import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.*;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.security.jwt.JwtService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -26,12 +27,13 @@ public class UserService {
     private final MemberRepository memberRepository;
     private final RoleRepository roleRepository;
     private final RolesXUserRepository rolesXUserRepository;
+    private final PasswordEncoder passwordEncoder;
 
     @Transactional
     public UserDto register(RegisterRequest registerRequest) {
         User user = User.builder()
                 .email(registerRequest.getEmail())
-                .passwordHash(registerRequest.getPassword())
+                .passwordHash(passwordEncoder.encode(registerRequest.getPassword()))
                 .lastName(registerRequest.getLastName())
                 .createdAt(Instant.now())
                 .build();
@@ -85,7 +87,7 @@ public class UserService {
     }
 
     public NewUserDto inviteUser(NewUserDto newUserDto) {
-        String token = jwtService.generateInvitationToken(newUserDto.getEmail());
+        String token = jwtService.generateInvitationToken(newUserDto);
         Status status = statusRepository.getFirstByDescription("PENDING");
         if (status == null){
             throw new RuntimeException("Status not found");

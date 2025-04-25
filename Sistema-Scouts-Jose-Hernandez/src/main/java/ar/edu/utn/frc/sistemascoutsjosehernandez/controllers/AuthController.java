@@ -1,10 +1,12 @@
 package ar.edu.utn.frc.sistemascoutsjosehernandez.controllers;
 
+import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.UserDto;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.auth.AuthResponse;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.auth.LoginRequest;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.auth.RegisterRequest;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.security.jwt.JwtService;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.services.AuthService;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.services.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class AuthController {
     private final AuthService authService;
     private final JwtService jwtService;
+    private final UserService userService;
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@RequestBody LoginRequest loginRequest) {
@@ -24,8 +27,8 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse>register(@RequestBody RegisterRequest registerRequest) {
-        return ResponseEntity.ok(authService.register(registerRequest));
+    public ResponseEntity<UserDto>register(@RequestBody RegisterRequest registerRequest) {
+        return ResponseEntity.ok(userService.register(registerRequest));
     }
 
     @GetMapping("/auth/invite/{token}")
