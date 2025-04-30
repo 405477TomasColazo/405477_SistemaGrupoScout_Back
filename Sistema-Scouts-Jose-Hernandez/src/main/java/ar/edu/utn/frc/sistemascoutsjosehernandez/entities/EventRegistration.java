@@ -36,8 +36,7 @@ public class EventRegistration {
     @Column(name = "attendance_confirmed")
     private Boolean attendanceConfirmed;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "payment_status_id")
+    @Enumerated(EnumType.STRING)
     private PaymentStatus paymentStatus;
 
     @Lob
