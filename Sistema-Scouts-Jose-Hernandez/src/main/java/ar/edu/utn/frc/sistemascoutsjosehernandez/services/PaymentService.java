@@ -170,8 +170,12 @@ public class PaymentService {
             Payment savedPayment = paymentRepository.save(payment);
 
             ProcessPaymentResponse response = new ProcessPaymentResponse();
-            if (mpPayment.getStatus().equalsIgnoreCase("COMPLETED")) {
+            if (mpPayment.getStatus().equalsIgnoreCase("approved")) {
                 response.setStatus("success");
+            }else if (mpPayment.getStatus().equalsIgnoreCase("pending")
+                    || mpPayment.getStatus().equalsIgnoreCase("in_process")
+                    || mpPayment.getStatus().equalsIgnoreCase("authorized")) {
+                response.setStatus("processing");
             }else {
                 response.setStatus("failed");
             }
@@ -247,7 +251,8 @@ public class PaymentService {
     private PaymentStatus mapMercadoPagoStatus(String mpStatus) {
         return switch (mpStatus) {
             case "approved" -> PaymentStatus.COMPLETED;
-            case "in_process", "pending" -> PaymentStatus.PENDING;
+            case  "pending"  -> PaymentStatus.PENDING;
+            case "in_process", "authorized" -> PaymentStatus.PROCESSING;
             default -> PaymentStatus.FAILED;
         };
     }
