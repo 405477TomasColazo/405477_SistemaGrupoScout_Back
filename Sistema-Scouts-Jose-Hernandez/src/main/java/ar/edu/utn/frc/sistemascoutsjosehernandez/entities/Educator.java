@@ -5,7 +5,9 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.ColumnDefault;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 
 @Getter
@@ -46,8 +48,25 @@ public class Educator {
     @Column(name = "position", length = 100)
     private String position;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "section_id")
+    private Section section;
+
     @Column(name = "start_date")
     private LocalDate startDate;
+
+    @Lob
+    @Column(name = "notes")
+    private String notes;
+
+    @ColumnDefault("0.00")
+    @Column(name = "account_balance", precision = 10, scale = 2)
+    private BigDecimal accountBalance;
+
+    @Size(max = 100)
+    @NotNull
+    @Column(name = "address",nullable = false,length = 100)
+    private String address;
 
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

@@ -1,15 +1,16 @@
 package ar.edu.utn.frc.sistemascoutsjosehernandez.repositories;
 
-import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.Member;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.Educator;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.Section;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
-public interface MemberRepository extends JpaRepository<Member, Integer> {
-    List<Member> findAllBySection(Section section);
+public interface EducatorRepository extends JpaRepository<Educator, Integer> {
+    Optional<Educator> findByUser_Id(Integer id);
 
-    List<Member> findAllByIsTutor(boolean isTutor);
+    List<Educator> findAllBySection(Section section);
 }
