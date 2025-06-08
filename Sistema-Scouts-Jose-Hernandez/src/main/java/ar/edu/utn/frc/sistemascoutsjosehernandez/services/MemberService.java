@@ -89,6 +89,7 @@ public class MemberService {
                     .memberId(relationship.getMember().getId())
                     .relationship(relationship.getRelationship())
                     .build();
+            
             relations.add(r);
         }
 
