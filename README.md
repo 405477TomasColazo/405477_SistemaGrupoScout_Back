@@ -319,23 +319,12 @@ Para reportar bugs o solicitar nuevas funcionalidades, crear un issue en el repo
 - Versión del sistema
 - Logs relevantes
 
-## 📄 Licencia
-
-Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
-
-## 👥 Equipo de Desarrollo
-
-- **Backend Developer**: [Tu Nombre]
-- **Project Lead**: [Nombre del Líder]
-- **QA Tester**: [Nombre del Tester]
-
 ## 📞 Contacto
 
 Para consultas sobre el proyecto:
-- Email: [email-contacto@ejemplo.com]
-- Slack: [canal-del-proyecto]
-- Documentación: [enlace-a-docs-internas]
+- Email: tomas.colazo.federico@gmail.com
+
 
 ---
 
-**Nota**: Este README está actualizado a enero 2025. Para la versión más reciente de la documentación, consultar el repositorio oficial.
+**Nota**: Este README está actualizado a junio 2025. Para la versión más reciente de la documentación, consultar el repositorio oficial.
