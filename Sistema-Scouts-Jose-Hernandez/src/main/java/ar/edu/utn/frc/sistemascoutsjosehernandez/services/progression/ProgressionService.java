@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -257,5 +258,19 @@ public class ProgressionService {
                 .createdAt(progress.getCreatedAt())
                 .updatedAt(progress.getUpdatedAt())
                 .build();
+    }
+
+    public MarchSheetDto updateProgressionStage(UpdateProgressionStageDto updateDto) {
+        Member member = memberRepository.findById(updateDto.getMemberId())
+                .orElseThrow(() -> new RuntimeException("Member not found with id: " + updateDto.getMemberId()));
+
+        MarchSheet marchSheet = marchSheetRepository.findByMemberId(updateDto.getMemberId())
+                .orElseThrow(() -> new RuntimeException("March sheet not found for member: " + updateDto.getMemberId()));
+
+        marchSheet.setProgressionStage(updateDto.getNewStage());
+        marchSheet.setUpdatedAt(Instant.now());
+
+        MarchSheet updatedMarchSheet = marchSheetRepository.save(marchSheet);
+        return convertMarchSheetToDto(updatedMarchSheet);
     }
 }

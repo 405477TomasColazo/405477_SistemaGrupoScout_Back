@@ -143,4 +143,16 @@ public class ProgressionController {
         
         return ResponseEntity.ok(pendingApprovals);
     }
+
+    @PutMapping("/progression-stage")
+    @Operation(summary = "Update progression stage (Educators and Admins only)")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('EDUCATOR')")
+    public ResponseEntity<MarchSheetDto> updateProgressionStage(@Valid @RequestBody UpdateProgressionStageDto updateDto) {
+        try {
+            MarchSheetDto updatedMarchSheet = progressionService.updateProgressionStage(updateDto);
+            return ResponseEntity.ok(updatedMarchSheet);
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
 }
