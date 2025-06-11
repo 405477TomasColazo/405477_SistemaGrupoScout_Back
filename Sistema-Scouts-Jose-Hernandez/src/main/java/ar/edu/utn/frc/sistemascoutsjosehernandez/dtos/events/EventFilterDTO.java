@@ -20,5 +20,5 @@ public class EventFilterDTO {
     private EventStatus status;
     private LocalDateTime dateFrom;
     private LocalDateTime dateTo;
-    private Long createdBy;
+    private Integer createdBy;
 }

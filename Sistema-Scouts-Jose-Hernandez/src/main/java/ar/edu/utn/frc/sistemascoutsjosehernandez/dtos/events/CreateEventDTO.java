@@ -46,7 +46,7 @@ public class CreateEventDTO {
     private EventStatus status = EventStatus.DRAFT;
 
     @NotNull(message = "Created by is required")
-    private Long createdBy;
+    private Integer createdBy;
 
     private LocalDateTime registrationDeadline;
     private InvitationType invitationType = InvitationType.ALL;

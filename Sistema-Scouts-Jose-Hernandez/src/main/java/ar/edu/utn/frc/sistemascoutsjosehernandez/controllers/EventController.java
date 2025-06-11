@@ -33,7 +33,7 @@ public class EventController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateFrom,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime dateTo,
-            @RequestParam(required = false) Long createdBy
+            @RequestParam(required = false) Integer createdBy
     ) {
         EventFilterDTO filter = new EventFilterDTO();
 
@@ -60,7 +60,7 @@ public class EventController {
 
     // GET /api/events/{id} - Obtener un evento específico
     @GetMapping("/{id}")
-    public ResponseEntity<EventDTO> getEvent(@PathVariable Long id) {
+    public ResponseEntity<EventDTO> getEvent(@PathVariable Integer id) {
         EventDTO event = eventService.getEventById(id);
         return ResponseEntity.ok(event);
     }
@@ -74,7 +74,7 @@ public class EventController {
     // PUT /api/events/{id} - Actualizar evento
     @PutMapping("/{id}")
     public ResponseEntity<EventDTO> updateEvent(
-            @PathVariable Long id,
+            @PathVariable Integer id,
             @Valid @RequestBody UpdateEventDTO updateEventDTO
     ) {
         EventDTO updatedEvent = eventService.updateEvent(id, updateEventDTO);
@@ -83,14 +83,14 @@ public class EventController {
 
     // DELETE /api/events/{id} - Eliminar evento
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteEvent(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteEvent(@PathVariable Integer id) {
         eventService.deleteEvent(id);
         return ResponseEntity.noContent().build();
     }
 
     // GET /api/events/{eventId}/registrations - Obtener registraciones de un evento
     @GetMapping("/{eventId}/registrations")
-    public ResponseEntity<List<EventRegistrationDTO>> getEventRegistrations(@PathVariable Long eventId) {
+    public ResponseEntity<List<EventRegistrationDTO>> getEventRegistrations(@PathVariable Integer eventId) {
         List<EventRegistrationDTO> registrations = eventRegistrationService.getEventRegistrations(eventId);
         return ResponseEntity.ok(registrations);
     }
@@ -98,7 +98,7 @@ public class EventController {
     // POST /api/events/{eventId}/register - Registrar miembros a un evento
     @PostMapping("/{eventId}/register")
     public ResponseEntity<List<EventRegistrationDTO>> registerMembersToEvent(
-            @PathVariable Long eventId,
+            @PathVariable Integer eventId,
             @Valid @RequestBody RegisterMembersRequestDTO request
     ) {
         List<EventRegistrationDTO> registrations = eventRegistrationService.registerMembersToEvent(
@@ -111,8 +111,8 @@ public class EventController {
     // PUT /api/events/{eventId}/registrations/{registrationId} - Actualizar estado de registración
     @PutMapping("/{eventId}/registrations/{registrationId}")
     public ResponseEntity<EventRegistrationDTO> updateRegistration(
-            @PathVariable Long eventId,
-            @PathVariable Long registrationId,
+            @PathVariable Integer eventId,
+            @PathVariable Integer registrationId,
             @Valid @RequestBody UpdateRegistrationStatusDTO request
     ) {
         EventRegistrationDTO updatedRegistration = eventRegistrationService.updateRegistrationStatus(
@@ -125,7 +125,7 @@ public class EventController {
 
     // POST /api/events/{eventId}/accept-invitation - Aceptar invitación a evento
 //    @PostMapping("/{eventId}/accept-invitation")
-//    public ResponseEntity<EventRegistrationDTO> acceptInvitation(@PathVariable Long eventId) {
+//    public ResponseEntity<EventRegistrationDTO> acceptInvitation(@PathVariable Integer eventId) {
 //        Long currentUserId = SecurityUtils.getCurrentUserId();
 //        EventRegistrationDTO registration = eventRegistrationService.respondToInvitation(
 //                eventId,
@@ -137,7 +137,7 @@ public class EventController {
 //
 //    // POST /api/events/{eventId}/reject-invitation - Rechazar invitación a evento
 //    @PostMapping("/{eventId}/reject-invitation")
-//    public ResponseEntity<Void> rejectInvitation(@PathVariable Long eventId) {
+//    public ResponseEntity<Void> rejectInvitation(@PathVariable Integer eventId) {
 //        Integer currentUserId = SecurityUtils.getCurrentUserId();
 //        eventRegistrationService.respondToInvitation(
 //                eventId,

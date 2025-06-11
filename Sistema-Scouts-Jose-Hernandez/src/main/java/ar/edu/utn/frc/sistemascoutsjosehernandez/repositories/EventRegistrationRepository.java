@@ -11,18 +11,18 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface EventRegistrationRepository extends JpaRepository<EventRegistration, Long> {
+public interface EventRegistrationRepository extends JpaRepository<EventRegistration, Integer> {
     
-    List<EventRegistration> findByEventIdOrderByRegistrationDateAsc(Long eventId);
+    List<EventRegistration> findByEventIdOrderByRegistrationDateAsc(Integer eventId);
     
     List<EventRegistration> findByMemberIdOrderByRegistrationDateDesc(Integer memberId);
     
-    Optional<EventRegistration> findByEventIdAndMemberId(Long eventId, Integer memberId);
+    Optional<EventRegistration> findByEventIdAndMemberId(Integer eventId, Integer memberId);
     
     @Query("SELECT COUNT(er) FROM EventRegistration er WHERE er.eventId = :eventId AND er.status IN :statuses")
-    Long countByEventIdAndStatusIn(@Param("eventId") Long eventId, @Param("statuses") List<RegistrationStatus> statuses);
+    Long countByEventIdAndStatusIn(@Param("eventId") Integer eventId, @Param("statuses") List<RegistrationStatus> statuses);
     
-    List<EventRegistration> findByEventIdAndStatus(Long eventId, RegistrationStatus status);
+    List<EventRegistration> findByEventIdAndStatus(Integer eventId, RegistrationStatus status);
     
-    boolean existsByEventIdAndMemberId(Long eventId, Integer memberId);
+    boolean existsByEventIdAndMemberId(Integer eventId, Integer memberId);
 }

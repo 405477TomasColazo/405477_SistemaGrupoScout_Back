@@ -9,7 +9,8 @@ public enum RegistrationStatus {
     PENDING("pending"),
     CONFIRMED("confirmed"),
     CANCELLED("cancelled"),
-    WAITLIST("waitlist");
+    WAITLIST("waitlist"),
+    DECLINED("declined");
 
     private final String value;
 

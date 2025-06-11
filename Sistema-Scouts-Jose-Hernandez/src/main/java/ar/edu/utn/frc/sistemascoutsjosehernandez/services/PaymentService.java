@@ -5,6 +5,8 @@ import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.Fee;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.Payment;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.PaymentItem;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.PaymentStatus;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.events.EventRegistration;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.EventRegistrationRepository;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.FeeRepository;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.PaymentRepository;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.UserRepository;
@@ -47,6 +49,7 @@ public class PaymentService {
     private final PaymentRepository paymentRepository;
     //private final UserRepository userRepository;
     private final FeeRepository feeRepository;
+    private final EventRegistrationRepository eventRegistrationRepository;
 
     @PostConstruct
     public void init() {
@@ -156,18 +159,19 @@ public class PaymentService {
             List<PaymentItem> items = createPaymentItemsFromFees(request.getFeeIds());
             payment.setItems(items);
 
+            Payment savedPayment = paymentRepository.save(payment);
 
                 for (Integer id : request.getFeeIds()){
                     Fee fee = feeRepository.findById(id).orElse(null);
                     if (fee != null){
                         fee.setStatus(mapMercadoPagoStatus(mpPayment.getStatus()));
                         feeRepository.save(fee);
+                        
+                        // Update EventRegistration payment status if this fee is for an event
+                        updateEventRegistrationPaymentStatus(fee, mapMercadoPagoStatus(mpPayment.getStatus()), savedPayment.getId().intValue());
                     }
 
                 }
-
-
-            Payment savedPayment = paymentRepository.save(payment);
 
             ProcessPaymentResponse response = new ProcessPaymentResponse();
             if (mpPayment.getStatus().equalsIgnoreCase("approved")) {
@@ -267,6 +271,31 @@ public class PaymentService {
         return feeRepository.findAllById(feeIds).stream()
                 .map(Fee::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+    
+    private void updateEventRegistrationPaymentStatus(Fee fee, PaymentStatus paymentStatus, Integer paymentId) {
+        // Check if this fee is for an event by looking for "Evento:" in the description
+        if (fee.getDescription() != null && fee.getDescription().startsWith("Evento:")) {
+            // Find event registration for this member and event
+            // We'll need to parse the event date from the period field to find the right registration
+            Optional<EventRegistration> registration = eventRegistrationRepository
+                    .findByMemberIdOrderByRegistrationDateDesc(fee.getMember().getId())
+                    .stream()
+                    .filter(reg -> {
+                        // This is a simple matching - ideally we should store eventId in Fee
+                        // For now, we match by member and assume latest registration for paid events
+                        return reg.getPaymentStatus() == null || 
+                               reg.getPaymentStatus() == ar.edu.utn.frc.sistemascoutsjosehernandez.entities.PaymentStatus.PENDING;
+                    })
+                    .findFirst();
+                    
+            if (registration.isPresent()) {
+                EventRegistration eventRegistration = registration.get();
+                eventRegistration.setPaymentStatus(paymentStatus);
+                eventRegistration.setPaymentId(paymentId);
+                eventRegistrationRepository.save(eventRegistration);
+            }
+        }
     }
 }
 //    public PaymentResponseDto createPaymentPreference(PaymentRequestDto paymentRequestDto) throws MPException, MPApiException {

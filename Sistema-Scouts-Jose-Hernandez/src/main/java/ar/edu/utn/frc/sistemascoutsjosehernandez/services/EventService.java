@@ -52,7 +52,7 @@ public class EventService {
                 .collect(Collectors.toList());
     }
 
-    public EventDTO getEventById(Long id) {
+    public EventDTO getEventById(Integer id) {
         Event event = eventRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Event not found with id: " + id));
         
@@ -91,7 +91,7 @@ public class EventService {
         return convertToDTO(savedEvent);
     }
 
-    public EventDTO updateEvent(Long id, @Valid UpdateEventDTO updateEventDTO) {
+    public EventDTO updateEvent(Integer id, @Valid UpdateEventDTO updateEventDTO) {
         Event event = eventRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Event not found with id: " + id));
 
@@ -148,7 +148,7 @@ public class EventService {
         return convertToDTO(savedEvent);
     }
 
-    public void deleteEvent(Long id) {
+    public void deleteEvent(Integer id) {
         if (!eventRepository.existsById(id)) {
             throw new RuntimeException("Event not found with id: " + id);
         }

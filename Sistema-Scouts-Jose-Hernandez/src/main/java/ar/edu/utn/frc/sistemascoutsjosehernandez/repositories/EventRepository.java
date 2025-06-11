@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Set;
 
 @Repository
-public interface EventRepository extends JpaRepository<Event, Long> {
+public interface EventRepository extends JpaRepository<Event, Integer> {
     
     @Query("SELECT e FROM Event e WHERE " +
            "(:sections IS NULL OR EXISTS (SELECT s FROM e.sections s WHERE s IN :sections)) AND " +
@@ -29,10 +29,10 @@ public interface EventRepository extends JpaRepository<Event, Long> {
             @Param("status") EventStatus status,
             @Param("dateFrom") LocalDateTime dateFrom,
             @Param("dateTo") LocalDateTime dateTo,
-            @Param("createdBy") Long createdBy
+            @Param("createdBy") Integer createdBy
     );
     
-    List<Event> findByCreatedByOrderByStartDateAsc(Long createdBy);
+    List<Event> findByCreatedByOrderByStartDateAsc(Integer createdBy);
     
     List<Event> findByStatusOrderByStartDateAsc(EventStatus status);
     

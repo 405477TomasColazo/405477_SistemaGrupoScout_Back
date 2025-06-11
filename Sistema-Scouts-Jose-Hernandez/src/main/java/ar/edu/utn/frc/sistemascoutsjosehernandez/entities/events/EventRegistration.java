@@ -18,10 +18,10 @@ import java.time.LocalDateTime;
 public class EventRegistration {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Integer id;
 
     @Column(name = "event_id", nullable = false)
-    private Long eventId;
+    private Integer eventId;
 
     @Column(name = "member_id", nullable = false)
     private Integer memberId;
@@ -43,7 +43,7 @@ public class EventRegistration {
     private PaymentStatus paymentStatus;
 
     @Column(name = "payment_id")
-    private Long paymentId;
+    private Integer paymentId;
 
     @Column(columnDefinition = "TEXT")
     private String notes;

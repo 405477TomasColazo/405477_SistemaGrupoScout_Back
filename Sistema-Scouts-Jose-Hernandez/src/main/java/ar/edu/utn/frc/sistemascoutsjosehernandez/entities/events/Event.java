@@ -22,7 +22,7 @@ import java.util.Set;
 public class Event {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Integer id;
 
     @Column(nullable = false)
     private String title;
@@ -61,7 +61,7 @@ public class Event {
     private EventStatus status = EventStatus.DRAFT;
 
     @Column(name = "created_by", nullable = false)
-    private Long createdBy;
+    private Integer createdBy;
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;

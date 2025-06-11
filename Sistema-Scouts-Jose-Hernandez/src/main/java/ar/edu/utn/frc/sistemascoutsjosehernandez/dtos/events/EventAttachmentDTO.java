@@ -12,8 +12,8 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @Builder
 public class EventAttachmentDTO {
-    private Long id;
-    private Long eventId;
+    private Integer id;
+    private Integer eventId;
     private String fileName;
     private String fileUrl;
     private String fileType;

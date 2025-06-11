@@ -17,7 +17,7 @@ import java.util.Set;
 @NoArgsConstructor
 @Builder
 public class EventDTO {
-    private Long id;
+    private Integer id;
     private String title;
     private String description;
     private EventType eventType;
@@ -29,7 +29,7 @@ public class EventDTO {
     private Integer maxCapacity;
     private Integer currentCapacity;
     private EventStatus status;
-    private Long createdBy;
+    private Integer createdBy;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime registrationDeadline;

@@ -14,14 +14,14 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @Builder
 public class EventRegistrationDTO {
-    private Long id;
-    private Long eventId;
+    private Integer id;
+    private Integer eventId;
     private Integer memberId;
     private String memberName;
     private String memberLastName;
     private LocalDateTime registrationDate;
     private RegistrationStatus status;
     private PaymentStatus paymentStatus;
-    private Long paymentId;
+    private Integer paymentId;
     private String notes;
 }
