@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface PaymentRepository extends JpaRepository<Payment, Integer> {
@@ -20,4 +21,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Integer> {
             "(:dateTo IS NULL OR p.paymentDate <= :dateTo) AND " +
             "(:minAmount IS NULL OR p.amount >= :minAmount)")
     Page<Payment> findByFilters(Integer memberId, String dateFrom, String dateTo, BigDecimal minAmount, Pageable pageable);
+    
+    // Find payment by MercadoPago reference ID for webhook processing
+    Optional<Payment> findByReferenceId(String referenceId);
 }

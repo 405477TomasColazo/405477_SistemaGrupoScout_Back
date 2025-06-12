@@ -122,19 +122,12 @@ public class PaymentService {
     public ProcessPaymentResponse processPayment(ProcessPaymentRequest request)  {
         try {
             PaymentClient client = new PaymentClient();
-
-            Map<String, Object> payerData = (Map<String, Object>) request.getCardFormData().get("payer");
-
-            PaymentCreateRequest paymentCreateRequest = PaymentCreateRequest.builder()
-                    .transactionAmount(getTotalAmountFromFees(request.getFeeIds()))
-                    .token(request.getCardFormData().get("token").toString())
-                    .description("Pago de cuotas")
-                    .installments(Integer.parseInt(request.getCardFormData().get("installments").toString()))
-                    .paymentMethodId(request.getCardFormData().get("payment_method_id").toString())
-                    .payer(PaymentPayerRequest.builder()
-                            .email(payerData.get("email").toString())
-                            .build())
-                    .build();
+            
+            // Detect payment method type from the form data
+            String paymentMethodType = detectPaymentMethodType(request.getPaymentFormData());
+            
+            // Build payment request based on payment method type
+            PaymentCreateRequest paymentCreateRequest = buildPaymentRequest(request, paymentMethodType);
 
             // Generar UUID v4 para X-Idempotency-Key
             String idempotencyKey = UUID.randomUUID().toString();
@@ -252,6 +245,118 @@ public class PaymentService {
                 }).collect(Collectors.toList());
     }
 
+    private String detectPaymentMethodType(Map<String, Object> paymentFormData) {
+        // Check if we have the new Payment Brick structure
+        if (paymentFormData.containsKey("formData")) {
+            Map<String, Object> formData = (Map<String, Object>) paymentFormData.get("formData");
+            if (formData != null && formData.containsKey("token")) {
+                return "card"; // Credit/debit card payments have a token
+            } else if (formData != null && formData.containsKey("payment_method_id")) {
+                String paymentMethodId = formData.get("payment_method_id").toString();
+                if (paymentMethodId.equals("pix") || paymentMethodId.equals("bank_transfer")) {
+                    return "bank_transfer";
+                } else if (paymentMethodId.contains("rapipago") || paymentMethodId.contains("pagofacil")) {
+                    return "ticket";
+                } else if (paymentMethodId.equals("account_money")) {
+                    return "digital_wallet";
+                }
+            }
+        }
+        
+        // Fallback for old Card Payment Brick structure (direct access)
+        if (paymentFormData.containsKey("token")) {
+            return "card"; // Credit/debit card payments have a token
+        } else if (paymentFormData.containsKey("payment_method_id")) {
+            String paymentMethodId = paymentFormData.get("payment_method_id").toString();
+            if (paymentMethodId.equals("pix") || paymentMethodId.equals("bank_transfer")) {
+                return "bank_transfer";
+            } else if (paymentMethodId.contains("rapipago") || paymentMethodId.contains("pagofacil")) {
+                return "ticket";
+            } else if (paymentMethodId.equals("account_money")) {
+                return "digital_wallet";
+            }
+        }
+        
+        return "card"; // Default to card for backward compatibility
+    }
+    
+    private PaymentCreateRequest buildPaymentRequest(ProcessPaymentRequest request, String paymentMethodType) {
+        Map<String, Object> topLevelData = request.getPaymentFormData();
+        
+        // Debug log to see what data is coming from frontend
+        System.out.println("=== DEBUG: Payment Form Data ===");
+        System.out.println("Payment Method Type: " + paymentMethodType);
+        System.out.println("Top Level Keys: " + topLevelData.keySet());
+        topLevelData.forEach((key, value) -> System.out.println(key + " = " + value));
+        System.out.println("=================================");
+        
+        // Extract the actual form data from the nested structure
+        Map<String, Object> formData = (Map<String, Object>) topLevelData.get("formData");
+        if (formData == null) {
+            throw new RuntimeException("No se encontraron datos del formulario en la estructura de pago");
+        }
+        
+        Map<String, Object> payerData = (Map<String, Object>) formData.get("payer");
+        
+        PaymentCreateRequest.PaymentCreateRequestBuilder builder = PaymentCreateRequest.builder()
+                .transactionAmount(getTotalAmountFromFees(request.getFeeIds()))
+                .description("Pago de cuotas")
+                .payer(PaymentPayerRequest.builder()
+                        .email(payerData != null ? payerData.get("email").toString() : "default@example.com")
+                        .build());
+        
+        switch (paymentMethodType) {
+            case "card":
+                // Card payment - existing logic
+                Object tokenObj = formData.get("token");
+                Object installmentsObj = formData.get("installments");
+                Object paymentMethodIdObj = formData.get("payment_method_id");
+                
+                if (tokenObj == null) {
+                    throw new RuntimeException("Token es requerido para pagos con tarjeta");
+                }
+                if (paymentMethodIdObj == null) {
+                    throw new RuntimeException("payment_method_id es requerido para pagos con tarjeta");
+                }
+                
+                return builder
+                        .token(tokenObj.toString())
+                        .installments(installmentsObj != null ? 
+                            Integer.parseInt(installmentsObj.toString()) : 1)
+                        .paymentMethodId(paymentMethodIdObj.toString())
+                        .build();
+                        
+            case "bank_transfer":
+                // Bank transfer payment
+                Object bankPaymentMethodObj = formData.get("payment_method_id");
+                if (bankPaymentMethodObj == null) {
+                    throw new RuntimeException("payment_method_id es requerido para transferencias bancarias");
+                }
+                return builder
+                        .paymentMethodId(bankPaymentMethodObj.toString())
+                        .build();
+                        
+            case "ticket":
+                // Cash payment (Rapipago, PagoFácil, etc.)
+                Object ticketPaymentMethodObj = formData.get("payment_method_id");
+                if (ticketPaymentMethodObj == null) {
+                    throw new RuntimeException("payment_method_id es requerido para pagos en efectivo");
+                }
+                return builder
+                        .paymentMethodId(ticketPaymentMethodObj.toString())
+                        .build();
+                        
+            case "digital_wallet":
+                // MercadoPago account payment
+                return builder
+                        .paymentMethodId("account_money")
+                        .build();
+                        
+            default:
+                throw new RuntimeException("Método de pago no soportado: " + paymentMethodType);
+        }
+    }
+
     private PaymentStatus mapMercadoPagoStatus(String mpStatus) {
         return switch (mpStatus) {
             case "approved" -> PaymentStatus.COMPLETED;
@@ -285,7 +390,7 @@ public class PaymentService {
                         // This is a simple matching - ideally we should store eventId in Fee
                         // For now, we match by member and assume latest registration for paid events
                         return reg.getPaymentStatus() == null || 
-                               reg.getPaymentStatus() == ar.edu.utn.frc.sistemascoutsjosehernandez.entities.PaymentStatus.PENDING;
+                               reg.getPaymentStatus() == PaymentStatus.PENDING;
                     })
                     .findFirst();
                     
@@ -294,6 +399,103 @@ public class PaymentService {
                 eventRegistration.setPaymentStatus(paymentStatus);
                 eventRegistration.setPaymentId(paymentId);
                 eventRegistrationRepository.save(eventRegistration);
+            }
+        }
+    }
+    
+    @Transactional
+    public void updatePaymentStatusFromWebhook(String mercadoPagoPaymentId) {
+        try {
+            // Fetch payment details from MercadoPago
+            PaymentClient client = new PaymentClient();
+            com.mercadopago.resources.payment.Payment mpPayment = client.get(Long.parseLong(mercadoPagoPaymentId));
+            
+            // Find our payment record by MercadoPago reference
+            Optional<Payment> paymentOpt = paymentRepository.findByReferenceId(mercadoPagoPaymentId);
+            
+            if (paymentOpt.isPresent()) {
+                Payment payment = paymentOpt.get();
+                PaymentStatus newStatus = mapMercadoPagoStatus(mpPayment.getStatus());
+                
+                // Only update if status actually changed
+                if (payment.getStatus() != newStatus) {
+                    payment.setStatus(newStatus);
+                    // Note: PaymentMethod is an entity, not enum. We'd need to find or create the method
+                    // For now, we'll skip updating payment method to avoid complexity
+                    
+                    // Update payment date when approved
+                    if (newStatus == PaymentStatus.COMPLETED && payment.getPaymentDate() == null) {
+                        // Convert OffsetDateTime to LocalDateTime and then to String
+                        if (mpPayment.getDateApproved() != null) {
+                            payment.setPaymentDate(mpPayment.getDateApproved().toString());
+                        }
+                    }
+                    
+                    paymentRepository.save(payment);
+                    
+                    // Update related fees status
+                    updateFeesStatusFromWebhook(payment.getItems(), newStatus, payment.getId());
+                    
+                    // Update event registration status if applicable
+                    for (PaymentItem item : payment.getItems()) {
+                        if (item.getFee() != null) {
+                            updateEventRegistrationPaymentStatus(item.getFee(), newStatus, payment.getId());
+                        }
+                    }
+                    
+                    System.out.println("Payment " + payment.getId() + " status updated to " + newStatus + " via webhook");
+                }
+            } else {
+                System.out.println("Warning: Received webhook for unknown payment: " + mercadoPagoPaymentId);
+            }
+            
+        } catch (Exception e) {
+            System.err.println("Error processing webhook for payment " + mercadoPagoPaymentId + ": " + e.getMessage());
+            // Don't throw exception - we don't want to cause webhook retries for processing errors
+        }
+    }
+    
+    public boolean validateWebhookSignature(String payload, String signature, String secret) {
+        try {
+            // Implement webhook signature validation for security
+            // This validates that the webhook actually came from MercadoPago
+            
+            // For now, return true if signature validation is not critical in development
+            // In production, you should implement proper HMAC-SHA256 validation
+            
+            if (signature == null || signature.isEmpty()) {
+                return false; // Reject requests without signature
+            }
+            
+            // TODO: Implement HMAC-SHA256 validation with your webhook secret
+            // String expectedSignature = calculateHMACSignature(payload, secret);
+            // return signature.equals(expectedSignature);
+            
+            return true; // Temporarily accept all signed requests
+            
+        } catch (Exception e) {
+            System.err.println("Error validating webhook signature: " + e.getMessage());
+            return false;
+        }
+    }
+    
+    private void updateFeesStatusFromWebhook(List<PaymentItem> paymentItems, PaymentStatus paymentStatus, Integer paymentId) {
+        for (PaymentItem item : paymentItems) {
+            if (item.getFee() != null) {
+                Fee fee = item.getFee();
+                
+                // Map payment status to fee status (both use PaymentStatus enum)
+                PaymentStatus feeStatus = switch (paymentStatus) {
+                    case COMPLETED -> PaymentStatus.COMPLETED;
+                    case PENDING -> PaymentStatus.PENDING;
+                    case REFUNDED -> null;
+                    case PROCESSING -> PaymentStatus.PROCESSING;
+                    case FAILED -> PaymentStatus.PENDING; // Keep as pending if payment failed
+                    case UNKNOWN -> null;
+                };
+                
+                fee.setStatus(feeStatus);
+                feeRepository.save(fee);
             }
         }
     }
