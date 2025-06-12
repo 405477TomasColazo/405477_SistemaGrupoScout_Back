@@ -2,12 +2,15 @@ package ar.edu.utn.frc.sistemascoutsjosehernandez.services;
 
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.User;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.events.Event;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.news.NewsArticle;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 @Service
 public class EmailService {
@@ -88,5 +91,46 @@ public class EmailService {
         message.setText(text);
 
         mailSender.send(message);
+    }
+    
+    public void sendNewsNotification(User user, NewsArticle article) {
+        String subject = "Nueva noticia - " + article.getTitle();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+        
+        String text = String.format(
+                "Hola %s!\n\n" +
+                "Se ha publicado una nueva noticia en el sitio del Grupo Scout José Hernández:\n\n" +
+                "📰 Título: %s\n" +
+                "📅 Fecha de publicación: %s\n\n" +
+                "📝 Resumen:\n%s\n\n" +
+                "Puedes leer el artículo completo en:\n" +
+                "http://localhost:4200/noticias/%s\n\n" +
+                "Saludos,\nGrupo Scout José Hernández",
+                user.getLastName(),
+                article.getTitle(),
+                article.getPublishDate().format(formatter),
+                article.getSummary(),
+                article.getSlug()
+        );
+
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom("tomeix13@gmail.com");
+        message.setTo(user.getEmail());
+        message.setSubject(subject);
+        message.setText(text);
+
+        mailSender.send(message);
+    }
+    
+    @Async
+    public void sendBulkNewsNotification(List<User> users, NewsArticle article) {
+        for (User user : users) {
+            try {
+                sendNewsNotification(user, article);
+                Thread.sleep(100);
+            } catch (Exception e) {
+                System.err.println("Error enviando email a " + user.getEmail() + ": " + e.getMessage());
+            }
+        }
     }
 }

@@ -108,7 +108,7 @@ public class ProgressionController {
             @PathVariable Integer progressId,
             @RequestBody ApproveCompetenceDto approveDto) {
         try {
-            Integer educatorId = securityUtils.getCurrentUserId();
+            Integer educatorId = SecurityUtils.getCurrentUserId();
             CompetenceProgressDto approvedProgress = progressionService.approveCompetence(progressId, educatorId, approveDto);
             return ResponseEntity.ok(approvedProgress);
         } catch (RuntimeException e) {
@@ -137,7 +137,7 @@ public class ProgressionController {
         if (securityUtils.hasRole("ADMIN")) {
             pendingApprovals = progressionService.getPendingApprovals();
         } else {
-            Integer educatorId = securityUtils.getCurrentUserId();
+            Integer educatorId = SecurityUtils.getCurrentUserId();
             pendingApprovals = progressionService.getPendingApprovalsByEducator(educatorId);
         }
         

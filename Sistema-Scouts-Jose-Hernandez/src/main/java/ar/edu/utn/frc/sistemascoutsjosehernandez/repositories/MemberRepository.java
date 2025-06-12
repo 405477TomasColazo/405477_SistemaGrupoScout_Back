@@ -16,4 +16,8 @@ public interface MemberRepository extends JpaRepository<Member, Integer> {
     List<Member> findAllByIsTutor(boolean isTutor);
     
     Optional<Member> findByUser(User user);
+
+    List<Member> findAllByMemberType_Id(Integer memberTypeId);
+
+    List<Member> findAllByFamilyGroup_Id(Integer familyGroupId);
 }
