@@ -16,6 +16,8 @@ public interface EventRegistrationRepository extends JpaRepository<EventRegistra
     List<EventRegistration> findByEventIdOrderByRegistrationDateAsc(Integer eventId);
     
     List<EventRegistration> findByMemberIdOrderByRegistrationDateDesc(Integer memberId);
+
+    List<EventRegistration> findAllByEventId(Integer eventId);
     
     Optional<EventRegistration> findByEventIdAndMemberId(Integer eventId, Integer memberId);
     

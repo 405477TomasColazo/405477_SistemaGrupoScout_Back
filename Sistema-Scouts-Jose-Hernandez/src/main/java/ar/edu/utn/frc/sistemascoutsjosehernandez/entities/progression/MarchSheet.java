@@ -14,7 +14,7 @@ import java.util.List;
 @Getter
 @Setter
 @Entity
-@Table(name = "march_sheets", schema = "jose_hernandez_db")
+@Table(name = "march_sheets")
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor

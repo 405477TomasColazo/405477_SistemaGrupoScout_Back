@@ -11,7 +11,7 @@ import java.time.LocalDate;
 @Getter
 @Setter
 @Entity
-@Table(name = "progress_evaluations", schema = "jose_hernandez_db")
+@Table(name = "progress_evaluations")
 public class ProgressEvaluation {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

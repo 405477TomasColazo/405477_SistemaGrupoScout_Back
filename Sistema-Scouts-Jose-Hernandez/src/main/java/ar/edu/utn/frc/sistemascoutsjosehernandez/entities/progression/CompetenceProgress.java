@@ -12,7 +12,7 @@ import java.time.LocalDate;
 @Getter
 @Setter
 @Entity
-@Table(name = "competence_progress", schema = "jose_hernandez_db")
+@Table(name = "competence_progress")
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor

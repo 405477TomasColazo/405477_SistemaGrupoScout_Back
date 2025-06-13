@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 
 @Entity
-@Table(name = "distribution_filters", schema = "jose_hernandez_db")
+@Table(name = "distribution_filters")
 @Getter
 @Setter
 @NoArgsConstructor

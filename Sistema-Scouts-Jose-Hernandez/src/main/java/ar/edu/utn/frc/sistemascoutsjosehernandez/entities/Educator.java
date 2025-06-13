@@ -3,8 +3,7 @@ package ar.edu.utn.frc.sistemascoutsjosehernandez.entities;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 import org.hibernate.annotations.ColumnDefault;
 
 import java.math.BigDecimal;
@@ -13,7 +12,10 @@ import java.time.LocalDate;
 @Getter
 @Setter
 @Entity
-@Table(name = "educators", schema = "jose_hernandez_db")
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
+@Table(name = "educators")
 public class Educator {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

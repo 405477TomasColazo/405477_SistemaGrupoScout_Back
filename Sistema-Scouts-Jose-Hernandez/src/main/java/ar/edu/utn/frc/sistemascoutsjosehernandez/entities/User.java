@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 @Getter
 @Setter
 @Entity
-@Table(name = "users", schema = "jose_hernandez_db")
+@Table(name = "users")
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
