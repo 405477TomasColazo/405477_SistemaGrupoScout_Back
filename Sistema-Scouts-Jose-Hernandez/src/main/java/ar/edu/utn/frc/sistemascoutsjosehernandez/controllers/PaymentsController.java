@@ -18,13 +18,13 @@ public class PaymentsController {
     private final PaymentService paymentService;
 
     @GetMapping("/fees/{memberId}")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('FAMILY', 'EDUCATOR', 'ADMIN')")
     public ResponseEntity<List<FeeDto>> getPendingFees(@PathVariable Integer memberId) {
         return ResponseEntity.ok(paymentService.getPendingFees(memberId));
     }
 
     @PostMapping("/create-preference")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('FAMILY', 'ADMIN')")
     public ResponseEntity<PaymentPreferenceResponse> createPaymentPreference(
             @RequestBody PaymentPreferenceRequest request) {
         PaymentPreferenceResponse response = paymentService.createPaymentPreference(request);
@@ -32,7 +32,7 @@ public class PaymentsController {
     }
 
     @PostMapping("/process")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('FAMILY', 'ADMIN')")
     public ResponseEntity<ProcessPaymentResponse> processPayment(
             @RequestBody ProcessPaymentRequest request) {
         ProcessPaymentResponse response = paymentService.processPayment(request);
@@ -40,7 +40,7 @@ public class PaymentsController {
     }
 
     @GetMapping("/history")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('FAMILY', 'EDUCATOR', 'ADMIN')")
     public ResponseEntity<PaymentsHistoryResponse> getPaymentHistory(
             @RequestParam(required = false) Integer memberId,
             @RequestParam(required = false) String dateFrom,

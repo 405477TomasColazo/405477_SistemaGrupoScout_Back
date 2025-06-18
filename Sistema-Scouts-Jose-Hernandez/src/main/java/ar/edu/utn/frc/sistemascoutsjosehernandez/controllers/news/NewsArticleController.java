@@ -12,6 +12,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -77,6 +78,7 @@ public class NewsArticleController {
 
     // Admin endpoints
     @GetMapping("/admin")
+    @PreAuthorize("hasAnyRole('NEWS_MANAGER', 'ADMIN')")
     @Operation(summary = "Obtener todos los artículos (Admin)", description = "Lista todos los artículos para administradores")
     public ResponseEntity<Page<NewsArticleSummaryDto>> getAllArticlesAdmin(
             @PageableDefault(size = 10) Pageable pageable) {
@@ -85,6 +87,7 @@ public class NewsArticleController {
     }
 
     @GetMapping("/admin/{id}")
+    @PreAuthorize("hasAnyRole('NEWS_MANAGER', 'ADMIN')")
     @Operation(summary = "Obtener artículo por ID (Admin)", description = "Obtiene un artículo específico para administradores")
     public ResponseEntity<NewsArticleDto> getArticleByIdAdmin(
             @Parameter(description = "ID del artículo") 
@@ -95,6 +98,7 @@ public class NewsArticleController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('NEWS_MANAGER', 'ADMIN')")
     @Operation(summary = "Crear artículo", description = "Crea un nuevo artículo de noticia")
     public ResponseEntity<NewsArticleDto> createArticle(
             @Valid @RequestBody CreateNewsArticleDto createDto) {
@@ -103,6 +107,7 @@ public class NewsArticleController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('NEWS_MANAGER', 'ADMIN')")
     @Operation(summary = "Actualizar artículo", description = "Actualiza un artículo existente")
     public ResponseEntity<NewsArticleDto> updateArticle(
             @Parameter(description = "ID del artículo") 
@@ -117,6 +122,7 @@ public class NewsArticleController {
     }
 
     @PostMapping("/{id}/publish")
+    @PreAuthorize("hasAnyRole('NEWS_MANAGER', 'ADMIN')")
     @Operation(summary = "Publicar artículo", description = "Cambia el estado del artículo a publicado")
     public ResponseEntity<NewsArticleDto> publishArticle(
             @Parameter(description = "ID del artículo") 
@@ -130,6 +136,7 @@ public class NewsArticleController {
     }
 
     @PostMapping("/{id}/unpublish")
+    @PreAuthorize("hasAnyRole('NEWS_MANAGER', 'ADMIN')")
     @Operation(summary = "Despublicar artículo", description = "Cambia el estado del artículo a borrador")
     public ResponseEntity<NewsArticleDto> unpublishArticle(
             @Parameter(description = "ID del artículo") 
@@ -143,6 +150,7 @@ public class NewsArticleController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('NEWS_MANAGER', 'ADMIN')")
     @Operation(summary = "Eliminar artículo", description = "Elimina un artículo permanentemente")
     public ResponseEntity<Void> deleteArticle(
             @Parameter(description = "ID del artículo") 

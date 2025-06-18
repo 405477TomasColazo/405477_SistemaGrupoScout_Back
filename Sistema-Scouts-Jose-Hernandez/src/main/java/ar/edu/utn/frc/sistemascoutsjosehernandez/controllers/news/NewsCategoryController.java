@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -51,6 +52,7 @@ public class NewsCategoryController {
     }
 
     @PostMapping
+    @PreAuthorize("hasAnyRole('NEWS_MANAGER', 'ADMIN')")
     @Operation(summary = "Crear categoría", description = "Crea una nueva categoría de noticias")
     public ResponseEntity<NewsCategoryDto> createCategory(
             @Valid @RequestBody CreateNewsCategoryDto createDto) {
@@ -63,6 +65,7 @@ public class NewsCategoryController {
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('NEWS_MANAGER', 'ADMIN')")
     @Operation(summary = "Actualizar categoría", description = "Actualiza una categoría existente")
     public ResponseEntity<NewsCategoryDto> updateCategory(
             @Parameter(description = "ID de la categoría") 
@@ -77,6 +80,7 @@ public class NewsCategoryController {
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('NEWS_MANAGER', 'ADMIN')")
     @Operation(summary = "Eliminar categoría", description = "Elimina una categoría permanentemente")
     public ResponseEntity<Void> deleteCategory(
             @Parameter(description = "ID de la categoría") 

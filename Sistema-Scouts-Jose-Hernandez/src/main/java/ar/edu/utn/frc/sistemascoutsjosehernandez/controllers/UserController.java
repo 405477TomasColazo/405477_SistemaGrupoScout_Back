@@ -15,7 +15,7 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping("/{email}")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasAnyRole('FAMILY', 'EDUCATOR', 'ADMIN')")
     public ResponseEntity<UserDto> getUser(@PathVariable String email) {
         return ResponseEntity.ok(userService.getUserByEmail(email));
     }

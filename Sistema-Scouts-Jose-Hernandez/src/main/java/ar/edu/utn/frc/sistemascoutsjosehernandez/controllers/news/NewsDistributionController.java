@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -28,6 +29,7 @@ public class NewsDistributionController {
     private final NewsDistributionService newsDistributionService;
 
     @PostMapping("/{articleId}/distribute")
+    @PreAuthorize("hasAnyRole('NEWS_MANAGER', 'ADMIN')")
     @Operation(summary = "Crear distribución", description = "Crea una nueva distribución de noticia por email")
     public ResponseEntity<NewsDistributionDto> createDistribution(
             @Parameter(description = "ID del artículo") 
@@ -54,6 +56,7 @@ public class NewsDistributionController {
     }
 
     @PostMapping("/distributions/{distributionId}/send")
+    @PreAuthorize("hasAnyRole('NEWS_MANAGER', 'ADMIN')")
     @Operation(summary = "Enviar distribución", description = "Ejecuta el envío de emails de una distribución")
     public ResponseEntity<Void> sendDistribution(
             @Parameter(description = "ID de la distribución") 
@@ -67,6 +70,7 @@ public class NewsDistributionController {
     }
 
     @GetMapping("/{articleId}/distributions")
+    @PreAuthorize("hasAnyRole('NEWS_MANAGER', 'ADMIN')")
     @Operation(summary = "Obtener historial de distribuciones", description = "Lista el historial de distribuciones de un artículo")
     public ResponseEntity<List<NewsDistributionDto>> getDistributionHistory(
             @Parameter(description = "ID del artículo") 
@@ -79,6 +83,7 @@ public class NewsDistributionController {
     }
 
     @GetMapping("/distributions/{distributionId}/recipients/preview")
+    @PreAuthorize("hasAnyRole('NEWS_MANAGER', 'ADMIN')")
     @Operation(summary = "Vista previa de destinatarios", description = "Muestra los destinatarios de una distribución")
     public ResponseEntity<List<String>> previewRecipients(
             @Parameter(description = "ID de la distribución") 

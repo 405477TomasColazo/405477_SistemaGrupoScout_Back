@@ -12,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -27,6 +28,7 @@ public class EventController {
 
     // GET /api/events - Obtener todos los eventos con filtros opcionales
     @GetMapping
+    @PreAuthorize("hasAnyRole('FAMILY', 'EDUCATOR', 'ADMIN')")
     public ResponseEntity<List<EventDTO>> getEvents(
             @RequestParam(required = false) String sections,
             @RequestParam(required = false) String eventType,
@@ -60,12 +62,14 @@ public class EventController {
 
     // GET /api/events/{id} - Obtener un evento específico
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('FAMILY', 'EDUCATOR', 'ADMIN')")
     public ResponseEntity<EventDTO> getEvent(@PathVariable Integer id) {
         EventDTO event = eventService.getEventById(id);
         return ResponseEntity.ok(event);
     }
     // POST /api/events - Crear nuevo evento
     @PostMapping
+    @PreAuthorize("hasAnyRole('EDUCATOR', 'ADMIN')")
     public ResponseEntity<EventDTO> createEvent(@Valid @RequestBody CreateEventDTO createEventDTO) {
         EventDTO createdEvent = eventService.createEvent(createEventDTO);
         return ResponseEntity.status(HttpStatus.CREATED).body(createdEvent);
@@ -73,6 +77,7 @@ public class EventController {
 
     // PUT /api/events/{id} - Actualizar evento
     @PutMapping("/{id}")
+    @PreAuthorize("hasAnyRole('EDUCATOR', 'ADMIN')")
     public ResponseEntity<EventDTO> updateEvent(
             @PathVariable Integer id,
             @Valid @RequestBody UpdateEventDTO updateEventDTO
@@ -83,6 +88,7 @@ public class EventController {
 
     // DELETE /api/events/{id} - Eliminar evento
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasAnyRole('EDUCATOR', 'ADMIN')")
     public ResponseEntity<Void> deleteEvent(@PathVariable Integer id) {
         eventService.deleteEvent(id);
         return ResponseEntity.noContent().build();
@@ -90,6 +96,7 @@ public class EventController {
 
     // GET /api/events/{eventId}/registrations - Obtener registraciones de un evento
     @GetMapping("/{eventId}/registrations")
+    @PreAuthorize("hasAnyRole('EDUCATOR', 'ADMIN')")
     public ResponseEntity<List<EventRegistrationDTO>> getEventRegistrations(@PathVariable Integer eventId) {
         List<EventRegistrationDTO> registrations = eventRegistrationService.getEventRegistrations(eventId);
         return ResponseEntity.ok(registrations);
@@ -97,6 +104,7 @@ public class EventController {
 
     // POST /api/events/{eventId}/register - Registrar miembros a un evento
     @PostMapping("/{eventId}/register")
+    @PreAuthorize("hasAnyRole('FAMILY', 'EDUCATOR', 'ADMIN')")
     public ResponseEntity<List<EventRegistrationDTO>> registerMembersToEvent(
             @PathVariable Integer eventId,
             @Valid @RequestBody RegisterMembersRequestDTO request
@@ -110,6 +118,7 @@ public class EventController {
 
     // PUT /api/events/{eventId}/registrations/{registrationId} - Actualizar estado de registración
     @PutMapping("/{eventId}/registrations/{registrationId}")
+    @PreAuthorize("hasAnyRole('EDUCATOR', 'ADMIN')")
     public ResponseEntity<EventRegistrationDTO> updateRegistration(
             @PathVariable Integer eventId,
             @PathVariable Integer registrationId,

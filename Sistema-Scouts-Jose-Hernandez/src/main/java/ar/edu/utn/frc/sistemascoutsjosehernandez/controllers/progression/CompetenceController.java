@@ -21,6 +21,7 @@ public class CompetenceController {
     private final CompetenceService competenceService;
 
     @GetMapping
+    @PreAuthorize("hasAnyRole('FAMILY', 'EDUCATOR', 'ADMIN')")
     @Operation(summary = "Get all competences")
     public ResponseEntity<List<CompetenceDto>> getAllCompetences(
             @RequestParam(required = false) GrowthArea area,
@@ -42,6 +43,7 @@ public class CompetenceController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("hasAnyRole('FAMILY', 'EDUCATOR', 'ADMIN')")
     @Operation(summary = "Get competence by ID")
     public ResponseEntity<CompetenceDto> getCompetenceById(@PathVariable Integer id) {
         return competenceService.getCompetenceById(id)
@@ -50,6 +52,7 @@ public class CompetenceController {
     }
 
     @GetMapping("/general")
+    @PreAuthorize("hasAnyRole('FAMILY', 'EDUCATOR', 'ADMIN')")
     @Operation(summary = "Get general competences (not section-specific)")
     public ResponseEntity<List<CompetenceDto>> getGeneralCompetences() {
         List<CompetenceDto> competences = competenceService.getGeneralCompetences();
