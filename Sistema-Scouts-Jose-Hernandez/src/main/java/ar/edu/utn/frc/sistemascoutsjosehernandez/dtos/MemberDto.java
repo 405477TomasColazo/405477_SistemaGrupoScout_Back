@@ -26,4 +26,6 @@ public class MemberDto {
     private BigDecimal accountBalance;
     private String memberType;
     private String address;
+    private String email;
+    private String contactPhone;
 }

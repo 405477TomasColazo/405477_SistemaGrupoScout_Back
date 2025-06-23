@@ -11,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.Period;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -86,10 +88,7 @@ public class FamilyGroupService {
         if (familyGroup == null) {
             throw new RuntimeException("User not found");
         }
-        Section section = sectionRepository.findFirstByDescription(member.getSection());
-        if (section == null) {
-            throw new RuntimeException("Section not found");
-        }
+        Section section = getSectionByAge(member.getBirthdate());
         Status status = statusRepository.getFirstByDescription("ACTIVE");
         MemberType type = memberTypeRepository.findFirstByDescription("PROTAGONISTA");
         Member protagonist = new Member();
@@ -228,7 +227,7 @@ public class FamilyGroupService {
                 .birthdate(member.getBirthdate())
                 .memberType("Protagonista")
                 .relationships(relations)
-                .section(member.getSection().getDescription())
+                .section(member.getSection() != null ? member.getSection().getDescription() : "Sin sección asignada")
                 .userId(member.getUser().getId())
                 .build();
     }
@@ -260,5 +259,54 @@ public class FamilyGroupService {
         relationship.setRelationship(relationshipDto.getRelationship());
         relationshipRepository.save(relationship);
         return relationshipDto;
+    }
+
+    public void deleteMember(Integer memberId) {
+        memberService.softDeleteMember(memberId);
+    }
+
+    public void deleteTutor(Integer tutorId) {
+        memberService.softDeleteMember(tutorId);
+    }
+
+    public MemberDto reactivateMember(Integer memberId) {
+        Member reactivatedMember = memberService.reactivateMember(memberId);
+        if (reactivatedMember.getIsTutor()) {
+            // For tutors, create a basic MemberDto without throwing exception
+            return MemberDto.builder()
+                    .id(reactivatedMember.getId())
+                    .name(reactivatedMember.getName())
+                    .lastName(reactivatedMember.getLastname())
+                    .address(reactivatedMember.getAddress())
+                    .notes(reactivatedMember.getNotes())
+                    .dni(reactivatedMember.getDni())
+                    .accountBalance(reactivatedMember.getAccountBalance())
+                    .birthdate(reactivatedMember.getBirthdate())
+                    .memberType("Tutor")
+                    .email(reactivatedMember.getEmail())
+                    .contactPhone(reactivatedMember.getContactPhone())
+                    .userId(reactivatedMember.getUser().getId())
+                    .build();
+        } else {
+            return toMemberDto(reactivatedMember);
+        }
+    }
+
+    public void deleteRelationship(Integer relationshipId) {
+        Relationship relationship = relationshipRepository.findById(relationshipId)
+                .orElseThrow(() -> new RuntimeException("Relationship not found"));
+        relationshipRepository.delete(relationship);
+    }
+
+    private Section getSectionByAge(LocalDate birthdate) {
+        LocalDate now = LocalDate.now();
+        int age = Period.between(birthdate,now).getYears();
+        return switch (age) {
+            case 7, 8, 9 -> sectionRepository.findFirstByDescription("Manada");
+            case 10, 11, 12, 13 -> sectionRepository.findFirstByDescription("Unidad");
+            case 14, 15, 16, 17 -> sectionRepository.findFirstByDescription("Caminantes");
+            case 18, 19, 20, 21 -> sectionRepository.findFirstByDescription("Rovers");
+            default -> throw new RuntimeException("Invalid age");
+        };
     }
 }
