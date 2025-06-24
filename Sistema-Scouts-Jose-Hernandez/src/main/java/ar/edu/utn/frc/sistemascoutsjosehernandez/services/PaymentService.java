@@ -41,7 +41,18 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
-// PDF imports will be added later when we fix the dependency
+// iText PDF imports
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
+import com.itextpdf.kernel.font.PdfFontFactory;
+import com.itextpdf.kernel.font.PdfFont;
+import com.itextpdf.io.font.constants.StandardFonts;
 
 
 @Service
@@ -160,6 +171,8 @@ public class PaymentService {
                     .build();
 
             List<PaymentItem> items = createPaymentItemsFromFees(request.getFeeIds());
+            // Set bidirectional relationship
+            items.forEach(item -> item.setPayment(payment));
             payment.setItems(items);
 
             Payment savedPayment = paymentRepository.save(payment);
@@ -325,18 +338,117 @@ public class PaymentService {
     }
 
     public byte[] generatePaymentReceipt(Integer paymentId) {
-        Payment payment = paymentRepository.findById(paymentId)
+        Payment payment = paymentRepository.findByIdWithItems(paymentId)
                 .orElseThrow(() -> new RuntimeException("Pago no encontrado"));
 
         return generatePDFReceipt(payment);
     }
 
     private byte[] generatePDFReceipt(Payment payment) {
+        try {
+            // Get member information
+            Member member = memberRepository.findById(payment.getMemberId()).orElse(null);
+            String memberName = member != null ? member.getName() + " " + member.getLastname() : "Miembro no encontrado";
+            
+            // Create ByteArrayOutputStream to hold PDF bytes
+            ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
+            
+            // Initialize PDF writer and document
+            PdfWriter writer = new PdfWriter(outputStream);
+            PdfDocument pdfDocument = new PdfDocument(writer);
+            Document document = new Document(pdfDocument);
+            
+            // Set up fonts
+            PdfFont boldFont = PdfFontFactory.createFont(StandardFonts.HELVETICA_BOLD);
+            PdfFont regularFont = PdfFontFactory.createFont(StandardFonts.HELVETICA);
+            
+            // Header
+            document.add(new Paragraph("GRUPO SCOUT JOSÉ HERNÁNDEZ")
+                    .setFont(boldFont)
+                    .setFontSize(18)
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setMarginBottom(5));
+            
+            document.add(new Paragraph("COMPROBANTE DE PAGO")
+                    .setFont(boldFont)
+                    .setFontSize(14)
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setMarginBottom(20));
+            
+            // Payment details table
+            Table paymentTable = new Table(2);
+            paymentTable.setWidth(UnitValue.createPercentValue(100));
+            
+            // Add payment details
+            addTableRow(paymentTable, "Referencia:", payment.getReferenceId() != null ? payment.getReferenceId() : "N/A", boldFont, regularFont);
+            addTableRow(paymentTable, "Fecha:", payment.getPaymentDate() != null ? payment.getPaymentDate().toString() : "N/A", boldFont, regularFont);
+            addTableRow(paymentTable, "Protagonista:", memberName, boldFont, regularFont);
+            addTableRow(paymentTable, "Monto Total:", "$" + payment.getAmount(), boldFont, regularFont);
+            addTableRow(paymentTable, "Estado:", payment.getStatus().toString(), boldFont, regularFont);
+            addTableRow(paymentTable, "Método:", payment.getPaymentMethod() != null ? payment.getPaymentMethod() : "N/A", boldFont, regularFont);
+            
+            document.add(paymentTable);
+            document.add(new Paragraph("\n"));
+            
+            // Payment items section
+            document.add(new Paragraph("CONCEPTOS PAGADOS")
+                    .setFont(boldFont)
+                    .setFontSize(12)
+                    .setMarginBottom(10));
+            
+            // Items table
+            Table itemsTable = new Table(3);
+            itemsTable.setWidth(UnitValue.createPercentValue(100));
+            
+            // Headers
+            itemsTable.addHeaderCell(new Cell().add(new Paragraph("Descripción").setFont(boldFont)));
+            itemsTable.addHeaderCell(new Cell().add(new Paragraph("Período").setFont(boldFont)));
+            itemsTable.addHeaderCell(new Cell().add(new Paragraph("Monto").setFont(boldFont)));
+            
+            // Items
+            for (PaymentItem item : payment.getItems()) {
+                itemsTable.addCell(new Cell().add(new Paragraph(item.getDescription() != null ? item.getDescription() : "N/A").setFont(regularFont)));
+                itemsTable.addCell(new Cell().add(new Paragraph(item.getPeriod() != null ? item.getPeriod() : "N/A").setFont(regularFont)));
+                itemsTable.addCell(new Cell().add(new Paragraph("$" + item.getAmount()).setFont(regularFont)));
+            }
+            
+            document.add(itemsTable);
+            document.add(new Paragraph("\n"));
+            
+            // Footer
+            document.add(new Paragraph("Este comprobante es válido como constancia de pago.")
+                    .setFont(regularFont)
+                    .setFontSize(10)
+                    .setTextAlignment(TextAlignment.CENTER)
+                    .setMarginTop(20));
+            
+            document.add(new Paragraph("Fecha de emisión: " + LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy")))
+                    .setFont(regularFont)
+                    .setFontSize(10)
+                    .setTextAlignment(TextAlignment.CENTER));
+            
+            // Close document
+            document.close();
+            
+            return outputStream.toByteArray();
+            
+        } catch (Exception e) {
+            // Fallback to text-based receipt if PDF generation fails
+            return generateFallbackTextReceipt(payment);
+        }
+    }
+    
+    private void addTableRow(Table table, String label, String value, PdfFont boldFont, PdfFont regularFont) {
+        table.addCell(new Cell().add(new Paragraph(label).setFont(boldFont)));
+        table.addCell(new Cell().add(new Paragraph(value).setFont(regularFont)));
+    }
+    
+    private byte[] generateFallbackTextReceipt(Payment payment) {
         // Get member information
         Member member = memberRepository.findById(payment.getMemberId()).orElse(null);
         String memberName = member != null ? member.getName() + " " + member.getLastname() : "Miembro no encontrado";
         
-        // Generate detailed text receipt
+        // Generate detailed text receipt as fallback
         StringBuilder content = new StringBuilder();
         content.append("GRUPO SCOUT JOSÉ HERNÁNDEZ\n");
         content.append("COMPROBANTE DE PAGO\n\n");

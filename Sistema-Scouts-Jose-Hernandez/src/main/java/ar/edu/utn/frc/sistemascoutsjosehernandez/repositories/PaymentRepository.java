@@ -71,4 +71,7 @@ public interface PaymentRepository extends JpaRepository<Payment, Integer> {
     List<Object[]> getPendingPaymentsBySection();
     
     Optional<Payment> findByReferenceId(String referenceId);
+    
+    @Query("SELECT p FROM Payment p LEFT JOIN FETCH p.items WHERE p.id = :id")
+    Optional<Payment> findByIdWithItems(@Param("id") Integer id);
 }
