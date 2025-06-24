@@ -72,7 +72,7 @@ public class User implements UserDetails {
 
     @Size(max = 100)
     @NotNull
-    @Column(name = "lastName", nullable = false, length = 100)
+    @Column(name = "last_name", nullable = false, length = 100)
     private String lastName;
 
     @Size(max = 255)

@@ -18,12 +18,29 @@ public class EmailService {
     @Autowired
     private JavaMailSender mailSender;
 
-    public void sendInvitation(String to, String token) {
-        String subject = "Invitación para registrarte en el grupo Scout Jose Hernandez";
+    public void sendInvitation(String to, String lastName, String userType, String token) {
+        String subject = "Invitación para registrarte en el grupo Scout José Hernández";
         String link = "http://localhost:4200/registro?token=" + token;
-        String text = "Hola!\n\nTe han invitado a registrarte en la plataforma. " +
-                "Por favor hacé clic en el siguiente enlace para completar tu registro:\n\n" + link +
-                "\n\nEste enlace expirará en 72 horas.";
+        
+        String userTypeText = "EDUCATOR".equals(userType) ? "educador/a" : "familiar";
+        String greeting = "Hola " + lastName + "!";
+        
+        String text = String.format(
+                "%s\n\n" +
+                "🎯 Te han invitado a formar parte del Grupo Scout José Hernández como %s.\n\n" +
+                "Para completar tu registro, por favor:\n" +
+                "1. Hacé clic en el siguiente enlace:\n" +
+                "   %s\n\n" +
+                "2. Completá tus datos personales\n" +
+                "3. Configurá tu contraseña\n\n" +
+                "⏰ Este enlace expirará en 72 horas por motivos de seguridad.\n\n" +
+                "Si tenés alguna duda, no dudes en contactarnos.\n\n" +
+                "¡Esperamos tenerte pronto en nuestra comunidad scout!\n\n" +
+                "---\n" +
+                "Grupo Scout José Hernández\n" +
+                "Sistema de Gestión Scout",
+                greeting, userTypeText, link
+        );
 
         SimpleMailMessage message = new SimpleMailMessage();
         message.setFrom("tomeix13@gmail.com");
@@ -32,6 +49,11 @@ public class EmailService {
         message.setText(text);
 
         mailSender.send(message);
+    }
+    
+    // Keep backward compatibility method
+    public void sendInvitation(String to, String token) {
+        sendInvitation(to, "", "FAMILY", token);
     }
     
     public void sendEventInvitation(User user, Event event) {
