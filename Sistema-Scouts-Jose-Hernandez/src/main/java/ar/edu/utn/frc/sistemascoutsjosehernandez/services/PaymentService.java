@@ -1,7 +1,7 @@
 package ar.edu.utn.frc.sistemascoutsjosehernandez.services;
 
 import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.payments.*;
-import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.Fee;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.*;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.Payment;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.PaymentItem;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.PaymentStatus;
@@ -10,6 +10,8 @@ import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.EventRegistrationR
 import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.FeeRepository;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.PaymentRepository;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.UserRepository;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.MemberRepository;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.FamilyGroupRepository;
 
 import com.mercadopago.MercadoPagoConfig;
 import com.mercadopago.client.payment.PaymentClient;
@@ -27,13 +29,19 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.PostConstruct;
+import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
+
+// PDF imports will be added later when we fix the dependency
 
 
 @Service
@@ -47,9 +55,11 @@ public class PaymentService {
     private String frontendUrl;
 
     private final PaymentRepository paymentRepository;
-    //private final UserRepository userRepository;
+    private final UserRepository userRepository;
     private final FeeRepository feeRepository;
     private final EventRegistrationRepository eventRegistrationRepository;
+    private final MemberRepository memberRepository;
+    private final FamilyGroupRepository familyGroupRepository;
 
     @PostConstruct
     public void init() {
@@ -190,12 +200,93 @@ public class PaymentService {
 
     public PaymentsHistoryResponse getPaymentsHistory(PaymentFilters filters, int page, int limit) {
         PageRequest pageRequest = PageRequest.of(page, limit);
+        
+        // Get current user and check if they are admin
+        String currentUserEmail = getCurrentUserEmail();
+        User currentUser = userRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        boolean isAdmin = currentUser.getRolesXUser().stream()
+                .anyMatch(roleXUser -> roleXUser.getRole().getDescription().equals("ROLE_ADMIN"));
+        
+        Page<Payment> paymentsPage;
+        
+        if (isAdmin) {
+            // Admin can see all payments
+            paymentsPage = paymentRepository.findByFilters(
+                    filters.getMemberId(),
+                    filters.getDateFrom(),
+                    filters.getDateTo(),
+                    filters.getMinAmount(),
+                    pageRequest
+            );
+        } else {
+            // Non-admin users can only see payments from their family
+            FamilyGroup familyGroup = familyGroupRepository.findFamilyGroupsByUser_Id(currentUser.getId());
+            if (familyGroup == null) {
+                throw new RuntimeException("Family group not found");
+            }
+            
+            List<Integer> familyMemberIds = memberRepository.findAllByFamilyGroup_Id(familyGroup.getId())
+                    .stream()
+                    .map(Member::getId)
+                    .collect(Collectors.toList());
+            
+            // Filter payments to only include family members
+            paymentsPage = paymentRepository.findByFilters(
+                    filters.getMemberId(),
+                    filters.getDateFrom(),
+                    filters.getDateTo(),
+                    filters.getMinAmount(),
+                    pageRequest
+            );
+            
+            // Additional filtering by family members
+            paymentsPage = paymentsPage.map(payment -> {
+                if (familyMemberIds.contains(payment.getMemberId())) {
+                    return payment;
+                }
+                return null;
+            });
+            
+            // Remove null entries
+            List<Payment> filteredPayments = paymentsPage.getContent().stream()
+                    .filter(payment -> payment != null && familyMemberIds.contains(payment.getMemberId()))
+                    .collect(Collectors.toList());
+            
+            // Create new page with filtered results
+            paymentsPage = new org.springframework.data.domain.PageImpl<>(
+                    filteredPayments,
+                    pageRequest,
+                    filteredPayments.size()
+            );
+        }
 
-        Page<Payment> paymentsPage = paymentRepository.findByFilters(
+        List<PaymentDto> paymentDTOs = paymentsPage.getContent().stream()
+                .map(this::mapToPaymentDTO)
+                .collect(Collectors.toList());
+
+        PaymentsHistoryResponse response = new PaymentsHistoryResponse();
+        response.setPayments(paymentDTOs);
+        response.setTotal((int) paymentsPage.getTotalElements());
+
+        return response;
+    }
+
+    public PaymentsHistoryResponse getAllPaymentsForAdmin(PaymentFilters filters, int page, int limit) {
+        PageRequest pageRequest = PageRequest.of(page, limit);
+
+        Page<Payment> paymentsPage = paymentRepository.findByAdminFilters(
                 filters.getMemberId(),
+                filters.getFamilyGroupId(),
+                filters.getSectionId(),
                 filters.getDateFrom(),
                 filters.getDateTo(),
                 filters.getMinAmount(),
+                filters.getMaxAmount(),
+                filters.getStatus(),
+                filters.getPaymentMethod(),
+                filters.getMemberName(),
                 pageRequest
         );
 
@@ -210,6 +301,116 @@ public class PaymentService {
         return response;
     }
 
+    @Transactional
+    public PaymentDto updatePaymentStatus(Integer paymentId, PaymentStatus newStatus, String reason) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new RuntimeException("Pago no encontrado"));
+
+        PaymentStatus oldStatus = payment.getStatus();
+        payment.setStatus(newStatus);
+        
+        Payment savedPayment = paymentRepository.save(payment);
+
+        for (PaymentItem item : payment.getItems()) {
+            if (item.getFee() != null) {
+                Fee fee = item.getFee();
+                fee.setStatus(newStatus);
+                feeRepository.save(fee);
+                
+                updateEventRegistrationPaymentStatus(fee, newStatus, paymentId);
+            }
+        }
+
+        return mapToPaymentDTO(savedPayment);
+    }
+
+    public byte[] generatePaymentReceipt(Integer paymentId) {
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new RuntimeException("Pago no encontrado"));
+
+        return generatePDFReceipt(payment);
+    }
+
+    private byte[] generatePDFReceipt(Payment payment) {
+        // Get member information
+        Member member = memberRepository.findById(payment.getMemberId()).orElse(null);
+        String memberName = member != null ? member.getName() + " " + member.getLastname() : "Miembro no encontrado";
+        
+        // Generate detailed text receipt
+        StringBuilder content = new StringBuilder();
+        content.append("GRUPO SCOUT JOSÉ HERNÁNDEZ\n");
+        content.append("COMPROBANTE DE PAGO\n\n");
+        content.append("==========================================\n");
+        content.append("DATOS DEL PAGO\n");
+        content.append("==========================================\n");
+        content.append("Referencia: ").append(payment.getReferenceId() != null ? payment.getReferenceId() : "N/A").append("\n");
+        content.append("Fecha: ").append(payment.getPaymentDate() != null ? payment.getPaymentDate() : "N/A").append("\n");
+        content.append("Beneficiario: ").append(memberName).append("\n");
+        content.append("Monto Total: $").append(payment.getAmount()).append("\n");
+        content.append("Estado: ").append(payment.getStatus()).append("\n");
+        content.append("Método: ").append(payment.getPaymentMethod() != null ? payment.getPaymentMethod() : "N/A").append("\n\n");
+        
+        content.append("==========================================\n");
+        content.append("CONCEPTOS PAGADOS\n");
+        content.append("==========================================\n");
+        
+        for (PaymentItem item : payment.getItems()) {
+            content.append("- ").append(item.getDescription() != null ? item.getDescription() : "N/A")
+                   .append(" (").append(item.getPeriod() != null ? item.getPeriod() : "N/A").append("): $")
+                   .append(item.getAmount()).append("\n");
+        }
+        
+        content.append("\n==========================================\n");
+        content.append("Este comprobante es válido como constancia de pago.\n");
+        content.append("Fecha de emisión: ").append(LocalDate.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))).append("\n");
+        content.append("==========================================\n");
+        
+        return content.toString().getBytes();
+    }
+
+    public PaymentStatisticsDto getPaymentStatistics(String dateFrom, String dateTo, Integer sectionId) {
+        List<Object[]> results = paymentRepository.getPaymentStatistics(dateFrom, dateTo);
+        
+        if (results.isEmpty()) {
+            return PaymentStatisticsDto.builder()
+                    .totalPayments(0L)
+                    .completedPayments(0L)
+                    .pendingPayments(0L)
+                    .failedPayments(0L)
+                    .totalAmount(BigDecimal.ZERO)
+                    .completedAmount(BigDecimal.ZERO)
+                    .pendingAmount(BigDecimal.ZERO)
+                    .averagePaymentAmount(BigDecimal.ZERO)
+                    .build();
+        }
+
+        Object[] result = results.get(0);
+        return PaymentStatisticsDto.builder()
+                .totalPayments(((Number) result[0]).longValue())
+                .completedPayments(((Number) result[1]).longValue())
+                .pendingPayments(((Number) result[2]).longValue())
+                .failedPayments(((Number) result[3]).longValue())
+                .totalAmount(convertToBigDecimal(result[4]))
+                .completedAmount(convertToBigDecimal(result[5]))
+                .pendingAmount(convertToBigDecimal(result[6]))
+                .averagePaymentAmount(convertToBigDecimal(result[7]))
+                .build();
+    }
+
+    public List<PendingPaymentsBySectionDto> getPendingPaymentsBySection() {
+        List<Object[]> results = paymentRepository.getPendingPaymentsBySection();
+        
+        return results.stream()
+                .map(result -> PendingPaymentsBySectionDto.builder()
+                        .sectionId(((Number) result[0]).intValue())
+                        .sectionName((String) result[1])
+                        .totalPendingFees(((Number) result[2]).longValue())
+                        .totalPendingAmount(convertToBigDecimal(result[3]))
+                        .membersWithPendingPayments(((Number) result[4]).longValue())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
     private PaymentDto mapToPaymentDTO(Payment savedPayment) {
         PaymentDto dto = new PaymentDto();
         List<PaymentItemDTO> itemDTOS = new ArrayList<>();
@@ -222,8 +423,14 @@ public class PaymentService {
                     .build();
             itemDTOS.add(temp);
         });
+        
+        // Get member information
+        Member member = memberRepository.findById(savedPayment.getMemberId()).orElse(null);
+        
         dto.setId(savedPayment.getId());
         dto.setMemberId(savedPayment.getMemberId());
+        dto.setMemberName(member != null ? member.getName() : "Miembro no encontrado");
+        dto.setMemberLastName(member != null ? member.getLastname() : "");
         dto.setAmount(savedPayment.getAmount());
         dto.setPaymentDate(savedPayment.getPaymentDate());
         dto.setStatus(savedPayment.getStatus().name().toLowerCase());
@@ -498,6 +705,34 @@ public class PaymentService {
                 feeRepository.save(fee);
             }
         }
+    }
+    
+    private BigDecimal convertToBigDecimal(Object value) {
+        if (value == null) {
+            return BigDecimal.ZERO;
+        }
+        if (value instanceof BigDecimal) {
+            return (BigDecimal) value;
+        }
+        if (value instanceof Number) {
+            return BigDecimal.valueOf(((Number) value).doubleValue());
+        }
+        if (value instanceof String) {
+            try {
+                return new BigDecimal((String) value);
+            } catch (NumberFormatException e) {
+                return BigDecimal.ZERO;
+            }
+        }
+        return BigDecimal.ZERO;
+    }
+    
+    private String getCurrentUserEmail() {
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        if (principal instanceof UserDetails) {
+            return ((UserDetails) principal).getUsername();
+        }
+        return principal.toString();
     }
 }
 //    public PaymentResponseDto createPaymentPreference(PaymentRequestDto paymentRequestDto) throws MPException, MPApiException {
