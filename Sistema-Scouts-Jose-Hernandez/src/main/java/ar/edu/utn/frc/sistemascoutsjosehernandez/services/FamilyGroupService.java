@@ -28,6 +28,7 @@ public class FamilyGroupService {
     private final MemberTypeRepository memberTypeRepository;
     private final StatusRepository statusRepository;
     private final MemberService memberService;
+    private final MonthlyFeeService monthlyFeeService;
 
     @Transactional
     public FamilyGroup newFamilyGroup(TutorDto tutor){
@@ -75,6 +76,7 @@ public class FamilyGroupService {
         Member tutorContact = getTutorContact(tutor, familyGroup);
         tutorContact.setStatus(status);
         tutorContact.setMemberType(type);
+        tutorContact.setAccountBalance(java.math.BigDecimal.ZERO);
         tutorContact = memberRepository.save(tutorContact);
 
         familyGroup.getTutors().add(tutorContact);
@@ -104,8 +106,16 @@ public class FamilyGroupService {
         protagonist.setUser(familyGroup.getUser());
         protagonist.setStatus(status);
         protagonist.setMemberType(type);
+        protagonist.setAccountBalance(java.math.BigDecimal.ZERO);
         protagonist = memberRepository.save(protagonist);
 
+        // Generate monthly fee for new protagonista member
+        try {
+            monthlyFeeService.generateFeesForNewMember(protagonist);
+        } catch (Exception e) {
+            // Log error but don't fail member creation
+            System.err.println("Error generating monthly fees for new member: " + e.getMessage());
+        }
 
         return toMemberDto(protagonist);
     }

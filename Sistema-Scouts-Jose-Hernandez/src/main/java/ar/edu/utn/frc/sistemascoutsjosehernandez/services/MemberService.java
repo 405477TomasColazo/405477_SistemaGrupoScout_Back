@@ -236,6 +236,7 @@ public class MemberService {
                 .status(getActiveStatus())
                 .isTutor(false)
                 .isActive(true)
+                .accountBalance(java.math.BigDecimal.ZERO)
                 .build();
                 
         Member savedMember = memberRepository.save(member);
@@ -269,6 +270,7 @@ public class MemberService {
                 .status(getActiveStatus())
                 .isTutor(true)
                 .isActive(true)
+                .accountBalance(java.math.BigDecimal.ZERO)
                 .build();
                 
         return memberRepository.save(tutor);

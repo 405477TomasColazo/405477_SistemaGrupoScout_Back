@@ -46,14 +46,20 @@ public class FamilyGroup {
 
     @Transient
     public List<Member> getTutors() {
-        List<Member> m = members.stream().filter(Member::getIsTutor).collect(Collectors.toList());
+        List<Member> m = members.stream()
+                .filter(Member::getIsTutor)
+                .filter(Member::getIsActive)
+                .collect(Collectors.toList());
         m.remove(mainContact);
         return m;
     }
 
     @Transient
     public List<Member> getMemberProtagonists() {
-        return members.stream().filter(m -> !m.getIsTutor()).collect(Collectors.toList());
+        return members.stream()
+                .filter(m -> !m.getIsTutor())
+                .filter(Member::getIsActive)
+                .collect(Collectors.toList());
     }
 
 }
