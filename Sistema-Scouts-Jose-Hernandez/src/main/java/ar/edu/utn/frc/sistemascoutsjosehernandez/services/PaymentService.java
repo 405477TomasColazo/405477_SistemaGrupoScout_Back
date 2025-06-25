@@ -846,7 +846,6 @@ public class PaymentService {
         }
         return principal.toString();
     }
-}
 //    public PaymentResponseDto createPaymentPreference(PaymentRequestDto paymentRequestDto) throws MPException, MPApiException {
 //        PreferenceClient client = new PreferenceClient();
 //
@@ -921,3 +920,63 @@ public class PaymentService {
 //
 //        return paymentRepository.save(payment);
 //    }
+
+    /**
+     * Get pending fees for admin with filtering and pagination
+     */
+    public Map<String, Object> getPendingFeesForAdmin(Map<String, Object> filters, int page, int limit) {
+        // Safe casting with null checks
+        String memberName = (String) filters.get("memberName");
+        Integer sectionId = filters.get("sectionId") != null ? (Integer) filters.get("sectionId") : null;
+        Integer familyGroupId = filters.get("familyGroupId") != null ? (Integer) filters.get("familyGroupId") : null;
+        BigDecimal minAmount = filters.get("minAmount") != null ? (BigDecimal) filters.get("minAmount") : null;
+        BigDecimal maxAmount = filters.get("maxAmount") != null ? (BigDecimal) filters.get("maxAmount") : null;
+        String period = (String) filters.get("period");
+        
+        Page<Fee> pendingFeesPage = feeRepository.findPendingFeesForAdmin(
+                memberName,
+                sectionId,
+                familyGroupId,
+                minAmount,
+                maxAmount,
+                period,
+                PageRequest.of(page, limit)
+        );
+
+        List<Map<String, Object>> feesWithMemberInfo = pendingFeesPage.getContent().stream()
+                .map(fee -> {
+                    Map<String, Object> feeInfo = new HashMap<>();
+                    feeInfo.put("id", fee.getId());
+                    feeInfo.put("description", fee.getDescription());
+                    feeInfo.put("amount", fee.getAmount());
+                    feeInfo.put("period", fee.getPeriod());
+                    feeInfo.put("status", fee.getStatus());
+                    
+                    // Flat structure for easier frontend consumption
+                    if (fee.getMember() != null) {
+                        feeInfo.put("memberId", fee.getMember().getId());
+                        feeInfo.put("memberName", fee.getMember().getName());
+                        feeInfo.put("memberLastName", fee.getMember().getLastname());
+                        feeInfo.put("sectionName", fee.getMember().getSection() != null ? fee.getMember().getSection().getDescription() : "Sin sección");
+                        feeInfo.put("familyGroupName", fee.getMember().getFamilyGroup() != null ? fee.getMember().getFamilyGroup().getName() : "Sin familia");
+                    } else {
+                        feeInfo.put("memberId", null);
+                        feeInfo.put("memberName", "Sin miembro");
+                        feeInfo.put("memberLastName", "");
+                        feeInfo.put("sectionName", "Sin sección");
+                        feeInfo.put("familyGroupName", "Sin familia");
+                    }
+                    
+                    return feeInfo;
+                })
+                .collect(Collectors.toList());
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("fees", feesWithMemberInfo);
+        response.put("total", pendingFeesPage.getTotalElements());
+        response.put("totalPages", pendingFeesPage.getTotalPages());
+        response.put("currentPage", page);
+
+        return response;
+    }
+}

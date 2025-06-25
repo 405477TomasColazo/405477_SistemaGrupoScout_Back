@@ -149,9 +149,18 @@ public class MonthlyFeeController {
             @RequestParam(required = false) String section,
             @RequestParam(required = false) String generationType) {
         
-        Page<FeeGenerationLog> logsPage = feeGenerationLogRepository.findAllByOrderByExecutionDateDesc(
-            PageRequest.of(page, limit)
-        );
+        Page<FeeGenerationLog> logsPage;
+        
+        if (generationType != null && !generationType.isEmpty()) {
+            logsPage = feeGenerationLogRepository.findWithFilters(
+                generationType,
+                PageRequest.of(page, limit)
+            );
+        } else {
+            logsPage = feeGenerationLogRepository.findAllByOrderByExecutionDateDesc(
+                PageRequest.of(page, limit)
+            );
+        }
         
         return ResponseEntity.ok(Map.of(
             "logs", logsPage.getContent(),

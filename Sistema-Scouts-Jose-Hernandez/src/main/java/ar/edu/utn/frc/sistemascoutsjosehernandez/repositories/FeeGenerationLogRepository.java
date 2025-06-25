@@ -35,4 +35,11 @@ public interface FeeGenerationLogRepository extends JpaRepository<FeeGenerationL
     
     @Query("SELECT COUNT(fgl) FROM FeeGenerationLog fgl WHERE fgl.generationMonth = :month")
     long countByGenerationMonth(@Param("month") String month);
+    
+    @Query("SELECT fgl FROM FeeGenerationLog fgl " +
+           "WHERE (:generationType IS NULL OR :generationType = '' OR fgl.executionType = :generationType) " +
+           "ORDER BY fgl.executionDate DESC")
+    Page<FeeGenerationLog> findWithFilters(
+            @Param("generationType") String generationType,
+            Pageable pageable);
 }

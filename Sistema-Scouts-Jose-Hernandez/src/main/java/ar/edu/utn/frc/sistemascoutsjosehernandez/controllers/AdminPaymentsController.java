@@ -2,7 +2,9 @@ package ar.edu.utn.frc.sistemascoutsjosehernandez.controllers;
 
 import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.payments.*;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.PaymentStatus;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.Section;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.services.PaymentService;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.SectionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -13,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/admin/payments")
@@ -21,6 +24,7 @@ import java.util.List;
 public class AdminPaymentsController {
 
     private final PaymentService paymentService;
+    private final SectionRepository sectionRepository;
 
     @GetMapping
     public ResponseEntity<PaymentsHistoryResponse> getAllPayments(
@@ -88,5 +92,36 @@ public class AdminPaymentsController {
     public ResponseEntity<List<PendingPaymentsBySectionDto>> getPendingPaymentsBySection() {
         List<PendingPaymentsBySectionDto> pendingPayments = paymentService.getPendingPaymentsBySection();
         return ResponseEntity.ok(pendingPayments);
+    }
+
+    @GetMapping("/pending-fees")
+    public ResponseEntity<Map<String, Object>> getPendingFees(
+            @RequestParam(required = false) Integer memberId,
+            @RequestParam(required = false) Integer familyGroupId,
+            @RequestParam(required = false) Integer sectionId,
+            @RequestParam(required = false) String memberName,
+            @RequestParam(required = false) BigDecimal minAmount,
+            @RequestParam(required = false) BigDecimal maxAmount,
+            @RequestParam(required = false) String period,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int limit) {
+
+        Map<String, Object> filters = new java.util.HashMap<>();
+        filters.put("memberId", memberId);
+        filters.put("familyGroupId", familyGroupId);
+        filters.put("sectionId", sectionId);
+        filters.put("memberName", memberName);
+        filters.put("minAmount", minAmount);
+        filters.put("maxAmount", maxAmount);
+        filters.put("period", period);
+
+        Map<String, Object> response = paymentService.getPendingFeesForAdmin(filters, page, limit);
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/sections")
+    public ResponseEntity<List<Section>> getAllSections() {
+        List<Section> sections = sectionRepository.findAll();
+        return ResponseEntity.ok(sections);
     }
 }

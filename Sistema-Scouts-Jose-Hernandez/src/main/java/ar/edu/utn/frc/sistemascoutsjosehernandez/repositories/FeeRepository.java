@@ -2,6 +2,8 @@ package ar.edu.utn.frc.sistemascoutsjosehernandez.repositories;
 
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.Fee;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.PaymentStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -50,4 +52,23 @@ public interface FeeRepository extends JpaRepository<Fee, Integer> {
     
     @Query("SELECT f FROM Fee f WHERE f.member.memberType.description = 'Protagonista' AND f.member.isActive = true AND f.status = 'PENDING' ORDER BY f.period ASC")
     List<Fee> findAllActiveProtagonistPendingFees();
+    
+    @Query("SELECT f FROM Fee f " +
+           "WHERE f.status = 'PENDING' " +
+           "AND (:memberName IS NULL OR :memberName = '' OR " +
+           "     LOWER(CONCAT(f.member.name, ' ', f.member.lastname)) LIKE LOWER(CONCAT('%', :memberName, '%'))) " +
+           "AND (:sectionId IS NULL OR f.member.section.id = :sectionId) " +
+           "AND (:familyGroupId IS NULL OR f.member.familyGroup.id = :familyGroupId) " +
+           "AND (:minAmount IS NULL OR f.amount >= :minAmount) " +
+           "AND (:maxAmount IS NULL OR f.amount <= :maxAmount) " +
+           "AND (:period IS NULL OR :period = '' OR f.period = :period) " +
+           "ORDER BY f.period DESC, f.member.name ASC")
+    Page<Fee> findPendingFeesForAdmin(
+            @Param("memberName") String memberName,
+            @Param("sectionId") Integer sectionId,
+            @Param("familyGroupId") Integer familyGroupId,
+            @Param("minAmount") BigDecimal minAmount,
+            @Param("maxAmount") BigDecimal maxAmount,
+            @Param("period") String period,
+            Pageable pageable);
 }
