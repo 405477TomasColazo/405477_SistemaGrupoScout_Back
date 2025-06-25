@@ -28,6 +28,7 @@ public class MemberService {
     private final RelationshipRepository relationshipRepository;
     private final MemberTypeRepository memberTypeRepository;
     private final StatusRepository statusRepository;
+    private final MonthlyFeeService monthlyFeeService;
 
 
     public Member updateMember(TutorDto tutorDto,Integer id) {
@@ -188,7 +189,17 @@ public class MemberService {
         
         member.setIsActive(true);
         member.setDeletedAt(null);
-        return memberRepository.save(member);
+        Member savedMember = memberRepository.save(member);
+        
+        // Generate monthly fee for reactivated protagonista member
+        try {
+            monthlyFeeService.generateFeesForNewMember(savedMember);
+        } catch (Exception e) {
+            // Log error but don't fail member reactivation
+            System.err.println("Error generating monthly fees for reactivated member: " + e.getMessage());
+        }
+        
+        return savedMember;
     }
 
     // Helper methods to get default entities
@@ -227,7 +238,17 @@ public class MemberService {
                 .isActive(true)
                 .build();
                 
-        return memberRepository.save(member);
+        Member savedMember = memberRepository.save(member);
+        
+        // Generate monthly fee for new protagonista member
+        try {
+            monthlyFeeService.generateFeesForNewMember(savedMember);
+        } catch (Exception e) {
+            // Log error but don't fail member creation
+            System.err.println("Error generating monthly fees for new member: " + e.getMessage());
+        }
+        
+        return savedMember;
     }
 
     public Member createTutor(TutorDto tutorDto, FamilyGroup familyGroup) throws DuplicateDniException {
