@@ -244,4 +244,35 @@ public class EmailService {
 
         mailSender.send(message);
     }
+    
+    public void sendPasswordResetEmail(String to, String lastName, String resetToken) {
+        String subject = "Recuperación de contraseña - Grupo Scout José Hernández";
+        String resetLink = "http://localhost:4200/auth/reset-password?token=" + resetToken;
+        
+        String text = String.format(
+                "Hola %s!\n\n" +
+                "🔐 Has solicitado restablecer tu contraseña en el sistema del Grupo Scout José Hernández.\n\n" +
+                "Para crear una nueva contraseña, por favor:\n" +
+                "1. Hacé clic en el siguiente enlace:\n" +
+                "   %s\n\n" +
+                "2. Ingresá tu nueva contraseña\n" +
+                "3. Confirmá los cambios\n\n" +
+                "⏰ Este enlace expirará en 1 hora por motivos de seguridad.\n\n" +
+                "Si no solicitaste este cambio, podés ignorar este mensaje de forma segura. " +
+                "Tu contraseña actual permanecerá sin cambios.\n\n" +
+                "Si tenés problemas para acceder o necesitás ayuda, no dudes en contactarnos.\n\n" +
+                "---\n" +
+                "Grupo Scout José Hernández\n" +
+                "Sistema de Gestión Scout",
+                lastName, resetLink
+        );
+
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom("tomeix13@gmail.com");
+        message.setTo(to);
+        message.setSubject(subject);
+        message.setText(text);
+
+        mailSender.send(message);
+    }
 }

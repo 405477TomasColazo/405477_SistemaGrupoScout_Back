@@ -87,6 +87,18 @@ public class User implements UserDetails {
     @Column(name = "last_login")
     private Instant lastLogin;
 
+    @Size(max = 50)
+    @Column(name = "avatar", length = 50)
+    @ColumnDefault("'default'")
+    private String avatar;
+
+    @Size(max = 255)
+    @Column(name = "password_reset_token")
+    private String passwordResetToken;
+
+    @Column(name = "password_reset_token_expiry")
+    private Instant passwordResetTokenExpiry;
+
     @OneToMany(mappedBy = "user", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     private List<RolesXUser> rolesXUser = new ArrayList<>();
 

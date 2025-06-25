@@ -17,6 +17,7 @@ public class UserDto {
     private Integer id;
     private String email;
     private String lastName;
+    private String avatar;
     private Instant createdAt;
     private Instant lastLogin;
     private List<RoleDto> roles;

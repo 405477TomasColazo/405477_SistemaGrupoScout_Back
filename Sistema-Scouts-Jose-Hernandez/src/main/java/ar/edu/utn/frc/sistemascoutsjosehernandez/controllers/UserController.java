@@ -3,11 +3,16 @@ package ar.edu.utn.frc.sistemascoutsjosehernandez.controllers;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.UserDto;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.NewUserDto;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.InvitationDto;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.auth.UpdateProfileRequest;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.auth.ChangePasswordRequest;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.Section;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.services.UserService;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.services.UserService.AvatarOption;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -59,5 +64,33 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<List<Section>> getAllSections() {
         return ResponseEntity.ok(userService.getAllSections());
+    }
+
+    // Profile management endpoints
+    @PutMapping("/profile")
+    @PreAuthorize("hasAnyRole('FAMILY', 'EDUCATOR', 'ADMIN')")
+    public ResponseEntity<UserDto> updateProfile(
+            @Valid @RequestBody UpdateProfileRequest request,
+            Authentication authentication) {
+        String email = authentication.getName();
+        UserDto updatedUser = userService.updateUserProfile(email, request);
+        return ResponseEntity.ok(updatedUser);
+    }
+
+    @PostMapping("/change-password")
+    @PreAuthorize("hasAnyRole('FAMILY', 'EDUCATOR', 'ADMIN')")
+    public ResponseEntity<String> changePassword(
+            @Valid @RequestBody ChangePasswordRequest request,
+            Authentication authentication) {
+        String email = authentication.getName();
+        userService.changePassword(email, request);
+        return ResponseEntity.ok("Password changed successfully");
+    }
+
+    @GetMapping("/avatars")
+    @PreAuthorize("hasAnyRole('FAMILY', 'EDUCATOR', 'ADMIN')")
+    public ResponseEntity<List<AvatarOption>> getAvailableAvatars() {
+        List<AvatarOption> avatars = userService.getAvailableAvatars();
+        return ResponseEntity.ok(avatars);
     }
 }

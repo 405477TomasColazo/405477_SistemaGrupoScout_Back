@@ -4,6 +4,10 @@ import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.UserDto;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.NewUserDto;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.InvitationDto;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.auth.RegisterRequest;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.auth.UpdateProfileRequest;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.auth.ChangePasswordRequest;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.auth.ForgotPasswordRequest;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.auth.ResetPasswordRequest;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.*;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.*;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.security.jwt.JwtService;
@@ -16,7 +20,9 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -219,6 +225,7 @@ public class UserService {
                 .createdAt(user.getCreatedAt())
                 .lastLogin(user.getLastLogin())
                 .lastName(user.getLastName())
+                .avatar(user.getAvatar())
                 .build();
     }
 
@@ -286,5 +293,145 @@ public class UserService {
                 .sentDate(invitation.getSendDate())
                 .sectionName(invitation.getSection() != null ? invitation.getSection().getDescription() : null)
                 .build();
+    }
+
+
+    @Transactional
+    public void changePassword(String email, ChangePasswordRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Verify current password
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            throw new RuntimeException("Current password is incorrect");
+        }
+
+        // Check if new password and confirmation match
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new RuntimeException("New password and confirmation do not match");
+        }
+
+        // Update password
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+    }
+
+    // Password Reset Methods
+
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Generate reset token
+        String resetToken = UUID.randomUUID().toString();
+        Instant tokenExpiry = Instant.now().plus(1, ChronoUnit.HOURS); // Token expires in 1 hour
+
+        user.setPasswordResetToken(resetToken);
+        user.setPasswordResetTokenExpiry(tokenExpiry);
+        userRepository.save(user);
+
+        // Send reset email
+        emailService.sendPasswordResetEmail(user.getEmail(), user.getLastName(), resetToken);
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        User user = userRepository.findByPasswordResetToken(request.getToken())
+                .orElseThrow(() -> new RuntimeException("Invalid or expired reset token"));
+
+        // Check if token is expired
+        if (user.getPasswordResetTokenExpiry().isBefore(Instant.now())) {
+            throw new RuntimeException("Reset token has expired");
+        }
+
+        // Check if new password and confirmation match
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new RuntimeException("New password and confirmation do not match");
+        }
+
+        // Update password and clear reset token
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        user.setPasswordResetToken(null);
+        user.setPasswordResetTokenExpiry(null);
+        userRepository.save(user);
+    }
+
+    public boolean validateResetToken(String token) {
+        return userRepository.findByPasswordResetToken(token)
+                .map(user -> user.getPasswordResetTokenExpiry().isAfter(Instant.now()))
+                .orElse(false);
+    }
+
+    // Avatar management
+    private String getAvatarUrl(String avatarId) {
+        if (avatarId == null || avatarId.trim().isEmpty()) {
+            avatarId = "default";
+        }
+        return "https://api.dicebear.com/9.x/lorelei-neutral/svg?seed=" + avatarId;
+    }
+
+    public List<AvatarOption> getAvailableAvatars() {
+        return List.of(
+            new AvatarOption("default", "Por defecto", "https://api.dicebear.com/9.x/lorelei-neutral/svg?seed=default"),
+            new AvatarOption("scout", "Scout", "https://api.dicebear.com/9.x/lorelei-neutral/svg?seed=scout"),
+            new AvatarOption("explorer", "Explorador", "https://api.dicebear.com/9.x/lorelei-neutral/svg?seed=explorer"),
+            new AvatarOption("ranger", "Guardabosque", "https://api.dicebear.com/9.x/lorelei-neutral/svg?seed=ranger"),
+            new AvatarOption("adventure", "Aventurero", "https://api.dicebear.com/9.x/lorelei-neutral/svg?seed=adventure"),
+            new AvatarOption("nature", "Naturaleza", "https://api.dicebear.com/9.x/lorelei-neutral/svg?seed=nature"),
+            new AvatarOption("forest", "Bosque", "https://api.dicebear.com/9.x/lorelei-neutral/svg?seed=forest"),
+            new AvatarOption("mountain", "Montaña", "https://api.dicebear.com/9.x/lorelei-neutral/svg?seed=mountain"),
+            new AvatarOption("river", "Río", "https://api.dicebear.com/9.x/lorelei-neutral/svg?seed=river"),
+            new AvatarOption("campfire", "Fogón", "https://api.dicebear.com/9.x/lorelei-neutral/svg?seed=campfire"),
+            new AvatarOption("compass", "Brújula", "https://api.dicebear.com/9.x/lorelei-neutral/svg?seed=compass")
+        );
+    }
+
+    // Update user profile and return UserDto
+    public UserDto updateUserProfile(String email, UpdateProfileRequest request) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        // Check if new email is already taken by another user
+        if (!user.getEmail().equals(request.getEmail())) {
+            if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+                throw new RuntimeException("Email already exists");
+            }
+        }
+
+        // Update user fields
+        user.setEmail(request.getEmail());
+        user.setLastName(request.getLastName());
+        if (request.getAvatar() != null) {
+            user.setAvatar(request.getAvatar());
+        }
+
+        User savedUser = userRepository.save(user);
+
+        return UserDto.builder()
+                .id(savedUser.getId())
+                .email(savedUser.getEmail())
+                .lastName(savedUser.getLastName())
+                .avatar(savedUser.getAvatar())
+                .createdAt(savedUser.getCreatedAt())
+                .lastLogin(savedUser.getLastLogin())
+                .build();
+    }
+
+    // Helper class for avatar options
+    public static class AvatarOption {
+        private String id;
+        private String name;
+        private String url;
+
+        public AvatarOption(String id, String name, String url) {
+            this.id = id;
+            this.name = name;
+            this.url = url;
+        }
+
+        public String getId() { return id; }
+        public String getName() { return name; }
+        public String getUrl() { return url; }
     }
 }

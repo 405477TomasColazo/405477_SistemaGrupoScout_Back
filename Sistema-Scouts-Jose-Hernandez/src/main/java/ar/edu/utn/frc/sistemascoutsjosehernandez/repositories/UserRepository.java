@@ -13,6 +13,8 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Integer> {
     Optional<User> findByEmail(String email);
     
+    Optional<User> findByPasswordResetToken(String passwordResetToken);
+    
     @Query("SELECT u FROM User u JOIN u.rolesXUser rx JOIN rx.role r WHERE r.description = :roleDescription")
     List<User> findByRoleDescription(@Param("roleDescription") String roleDescription);
 }
