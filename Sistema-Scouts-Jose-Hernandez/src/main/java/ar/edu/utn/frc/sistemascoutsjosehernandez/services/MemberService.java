@@ -4,12 +4,15 @@ import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.MemberDto;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.RelationshipDto;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.SectionMemberDto;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.TutorDto;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.UpdateAccountBalanceRequest;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.*;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.exceptions.DuplicateDniException;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
@@ -305,5 +308,31 @@ public class MemberService {
             sectionMemberDtos.add(toSectionMemberDto(edu));
         }
         return sectionMemberDtos;
+    }
+
+    @Transactional
+    public SectionMemberDto updateMemberAccountBalance(Integer memberId, UpdateAccountBalanceRequest request) {
+        // Try to find in members first
+        Optional<Member> memberOptional = memberRepository.findById(memberId);
+        if (memberOptional.isPresent()) {
+            Member member = memberOptional.get();
+            if (!member.getIsActive()) {
+                throw new RuntimeException("Cannot update balance for inactive member");
+            }
+            member.setAccountBalance(request.getNewBalance());
+            Member savedMember = memberRepository.save(member);
+            return toSectionMemberDto(savedMember);
+        }
+        
+        // Try to find in educators
+        Optional<Educator> educatorOptional = educatorRepository.findById(memberId);
+        if (educatorOptional.isPresent()) {
+            Educator educator = educatorOptional.get();
+            educator.setAccountBalance(request.getNewBalance());
+            Educator savedEducator = educatorRepository.save(educator);
+            return toSectionMemberDto(savedEducator);
+        }
+        
+        throw new RuntimeException("Member or Educator not found with ID: " + memberId);
     }
 }
