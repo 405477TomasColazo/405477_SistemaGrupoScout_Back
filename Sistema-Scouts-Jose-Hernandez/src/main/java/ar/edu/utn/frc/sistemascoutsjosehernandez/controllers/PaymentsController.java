@@ -59,6 +59,22 @@ public class PaymentsController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/balance/{memberId}")
+    @PreAuthorize("hasAnyRole('FAMILY', 'EDUCATOR', 'ADMIN')")
+    public ResponseEntity<Map<String, BigDecimal>> getMemberBalance(@PathVariable Integer memberId) {
+        BigDecimal balance = paymentService.getMemberBalance(memberId);
+        Map<String, BigDecimal> response = Map.of("balance", balance);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/apply-balance")
+    @PreAuthorize("hasAnyRole('FAMILY', 'ADMIN')")
+    public ResponseEntity<ApplyBalanceResponse> applyBalanceToFees(
+            @RequestBody ApplyBalanceRequest request) {
+        ApplyBalanceResponse response = paymentService.applyBalanceToFees(request);
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/webhook")
     public ResponseEntity<String> handleWebhook(@RequestBody Map<String, Object> payload,
                                                @RequestHeader Map<String, String> headers) {

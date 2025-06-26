@@ -979,4 +979,113 @@ public class PaymentService {
 
         return response;
     }
+
+    // New balance-related methods
+    public BigDecimal getMemberBalance(Integer memberId) {
+        Member member = memberRepository.findById(memberId)
+                .orElseThrow(() -> new RuntimeException("Miembro no encontrado"));
+        return member.getAccountBalance() != null ? member.getAccountBalance() : BigDecimal.ZERO;
+    }
+
+    @Transactional
+    public ApplyBalanceResponse applyBalanceToFees(ApplyBalanceRequest request) {
+        try {
+            // Validate member exists
+            Member member = memberRepository.findById(request.getMemberId())
+                    .orElseThrow(() -> new RuntimeException("Miembro no encontrado"));
+
+            // Get current balance
+            BigDecimal currentBalance = member.getAccountBalance() != null ? member.getAccountBalance() : BigDecimal.ZERO;
+            
+            if (currentBalance.compareTo(BigDecimal.ZERO) <= 0) {
+                return ApplyBalanceResponse.builder()
+                        .status("error")
+                        .message("No hay balance disponible en la cuenta")
+                        .balanceUsed(BigDecimal.ZERO)
+                        .remainingBalance(currentBalance)
+                        .updatedFees(Collections.emptyList())
+                        .feesPaidCompletely(0)
+                        .build();
+            }
+
+            // Get fees to apply balance to
+            List<Fee> fees = feeRepository.findAllById(request.getFeeIds()).stream()
+                    .filter(fee -> fee.getStatus() == PaymentStatus.PENDING)
+                    .collect(Collectors.toList());
+
+            if (fees.isEmpty()) {
+                return ApplyBalanceResponse.builder()
+                        .status("error")
+                        .message("No se encontraron cuotas pendientes para aplicar el balance")
+                        .balanceUsed(BigDecimal.ZERO)
+                        .remainingBalance(currentBalance)
+                        .updatedFees(Collections.emptyList())
+                        .feesPaidCompletely(0)
+                        .build();
+            }
+
+            // Calculate total amount of selected fees
+            BigDecimal totalFeesAmount = fees.stream()
+                    .map(Fee::getAmount)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            // Calculate how much balance we can use
+            BigDecimal balanceToUse = currentBalance.min(totalFeesAmount);
+            BigDecimal remainingAmount = totalFeesAmount.subtract(balanceToUse);
+            
+            // Apply balance proportionally to each fee
+            BigDecimal remainingBalance = balanceToUse;
+            List<FeeDto> updatedFees = new ArrayList<>();
+            int feesPaidCompletely = 0;
+
+            for (Fee fee : fees) {
+                if (remainingBalance.compareTo(BigDecimal.ZERO) <= 0) {
+                    break;
+                }
+
+                BigDecimal originalAmount = fee.getAmount();
+                BigDecimal discountForThisFee = remainingBalance.min(originalAmount);
+                BigDecimal newAmount = originalAmount.subtract(discountForThisFee);
+                
+                // Update fee amount
+                fee.setAmount(newAmount);
+                
+                // If fee amount becomes 0, mark as paid
+                if (newAmount.compareTo(BigDecimal.ZERO) == 0) {
+                    fee.setStatus(PaymentStatus.COMPLETED);
+                    feesPaidCompletely++;
+                }
+                
+                feeRepository.save(fee);
+                remainingBalance = remainingBalance.subtract(discountForThisFee);
+                
+                // Add to updated fees list
+                updatedFees.add(toFeeDto(fee));
+            }
+
+            // Update member's balance
+            BigDecimal newMemberBalance = currentBalance.subtract(balanceToUse);
+            member.setAccountBalance(newMemberBalance);
+            memberRepository.save(member);
+
+            return ApplyBalanceResponse.builder()
+                    .status("success")
+                    .message("Balance aplicado exitosamente a las cuotas seleccionadas")
+                    .balanceUsed(balanceToUse)
+                    .remainingBalance(newMemberBalance)
+                    .updatedFees(updatedFees)
+                    .feesPaidCompletely(feesPaidCompletely)
+                    .build();
+
+        } catch (Exception e) {
+            return ApplyBalanceResponse.builder()
+                    .status("error")
+                    .message("Error al aplicar balance: " + e.getMessage())
+                    .balanceUsed(BigDecimal.ZERO)
+                    .remainingBalance(BigDecimal.ZERO)
+                    .updatedFees(Collections.emptyList())
+                    .feesPaidCompletely(0)
+                    .build();
+        }
+    }
 }
