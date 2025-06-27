@@ -82,6 +82,7 @@ public class UserService {
                 .address(registerRequest.getTutor().getAddress())
                 .birthdate(registerRequest.getTutor().getBirthdate())
                 .notes(registerRequest.getTutor().getNotes())
+                .isActive(true)
                 .build();
         member = memberRepository.save(member);
 

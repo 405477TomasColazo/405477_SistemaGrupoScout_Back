@@ -17,6 +17,8 @@ import java.util.Optional;
 @Repository
 public interface FeeRepository extends JpaRepository<Fee, Integer> {
     List<Fee> findByMemberIdAndStatus(Integer memberId, PaymentStatus status);
+    
+    List<Fee> findByStatus(PaymentStatus status);
 
     @Modifying
     @Query("UPDATE Fee f SET f.status = :status WHERE f.id IN :ids")
