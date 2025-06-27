@@ -275,4 +275,82 @@ public class EmailService {
 
         mailSender.send(message);
     }
+    
+    /**
+     * Send notification to admin when a new contact message is received
+     */
+    @Async
+    public void sendContactNotificationToAdmin(ar.edu.utn.frc.sistemascoutsjosehernandez.entities.ContactMessage contactMessage) {
+        String subject = "Nuevo mensaje de contacto - " + contactMessage.getSubject();
+        
+        String text = String.format(
+                "Se ha recibido un nuevo mensaje de contacto en el sitio web del Grupo Scout José Hernández.\n\n" +
+                "📋 DETALLES DEL MENSAJE:\n" +
+                "👤 Nombre: %s\n" +
+                "📧 Email: %s\n" +
+                "📝 Asunto: %s\n" +
+                "🏷️ Tipo: %s\n" +
+                "📅 Fecha: %s\n\n" +
+                "💬 MENSAJE:\n%s\n\n" +
+                "---\n" +
+                "Para gestionar este mensaje, ingresa al panel de administración:\n" +
+                "http://localhost:4200/admin/contact\n\n" +
+                "Grupo Scout José Hernández\n" +
+                "Sistema de Gestión Scout",
+                contactMessage.getName(),
+                contactMessage.getEmail(),
+                contactMessage.getSubject(),
+                contactMessage.getMessageType().toString(),
+                contactMessage.getCreatedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")),
+                contactMessage.getMessage()
+        );
+
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom("tomeix13@gmail.com");
+        message.setTo("gsjosehernandez378@gmail.com"); // Admin email
+        message.setSubject(subject);
+        message.setText(text);
+
+        mailSender.send(message);
+    }
+    
+    /**
+     * Send auto-reply confirmation to user when they submit a contact form
+     */
+    @Async
+    public void sendContactAutoReply(ar.edu.utn.frc.sistemascoutsjosehernandez.entities.ContactMessage contactMessage) {
+        String subject = "Mensaje recibido - Grupo Scout José Hernández";
+        
+        String text = String.format(
+                "Hola %s!\n\n" +
+                "Hemos recibido tu mensaje de contacto y queremos agradecerte por comunicarte con nosotros.\n\n" +
+                "📋 RESUMEN DE TU CONSULTA:\n" +
+                "📝 Asunto: %s\n" +
+                "📅 Fecha de envío: %s\n" +
+                "🆔 Número de referencia: #%d\n\n" +
+                "Nuestro equipo revisará tu consulta y te responderemos a la brevedad posible, " +
+                "generalmente dentro de las próximas 24 a 48 horas.\n\n" +
+                "Si tu consulta es urgente, también podés contactarnos a través de:\n" +
+                "📧 Email: gsjosehernandez378@gmail.com\n" +
+                "📱 Instagram: @josehernandez378\n" +
+                "📍 Dirección: Nuflo de Aguilar 562, Barrio Marqués de Sobremonte, Córdoba\n" +
+                "🕐 Horarios de reunión: Sábados de 14:30 a 18:30 hs\n\n" +
+                "¡Gracias por tu interés en el Grupo Scout José Hernández!\n\n" +
+                "---\n" +
+                "Grupo Scout José Hernández\n" +
+                "Sistema de Gestión Scout",
+                contactMessage.getName(),
+                contactMessage.getSubject(),
+                contactMessage.getCreatedAt().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")),
+                contactMessage.getId()
+        );
+
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setFrom("tomeix13@gmail.com");
+        message.setTo(contactMessage.getEmail());
+        message.setSubject(subject);
+        message.setText(text);
+
+        mailSender.send(message);
+    }
 }
