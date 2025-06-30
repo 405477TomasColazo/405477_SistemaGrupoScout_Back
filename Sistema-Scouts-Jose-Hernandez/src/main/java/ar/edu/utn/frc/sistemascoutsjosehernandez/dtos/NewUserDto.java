@@ -12,4 +12,6 @@ import lombok.NoArgsConstructor;
 public class NewUserDto {
     private String email;
     private String lastName;
+    private String userType; // "FAMILY" or "EDUCATOR"
+    private Integer sectionId; // Only for educators
 }

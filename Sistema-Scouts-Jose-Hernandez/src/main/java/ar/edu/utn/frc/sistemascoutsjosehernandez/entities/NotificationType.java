@@ -9,7 +9,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @Entity
-@Table(name = "notification_types", schema = "jose_hernandez_db")
+@Table(name = "notification_types")
 public class NotificationType {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

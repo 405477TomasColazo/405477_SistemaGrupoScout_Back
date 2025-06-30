@@ -15,6 +15,8 @@ import java.util.List;
 public class PaymentDto {
     private Integer id;
     private Integer memberId;
+    private String memberName;
+    private String memberLastName;
     private BigDecimal amount;
     private String paymentDate;
     private String status; // completed, processing, failed

@@ -13,7 +13,7 @@ import java.util.stream.Collectors;
 @Getter
 @Setter
 @Entity
-@Table(name = "family_groups", schema = "jose_hernandez_db")
+@Table(name = "family_groups")
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
@@ -46,16 +46,20 @@ public class FamilyGroup {
 
     @Transient
     public List<Member> getTutors() {
-        List<Member> m = members.stream().filter(Member::getIsTutor).collect(Collectors.toList());
-        if(m.contains(mainContact)) {
-            m.remove(mainContact);
-        }
+        List<Member> m = members.stream()
+                .filter(Member::getIsTutor)
+                .filter(Member::getIsActive)
+                .collect(Collectors.toList());
+        m.remove(mainContact);
         return m;
     }
 
     @Transient
     public List<Member> getMemberProtagonists() {
-        return members.stream().filter(m -> !m.getIsTutor()).collect(Collectors.toList());
+        return members.stream()
+                .filter(m -> !m.getIsTutor())
+                .filter(Member::getIsActive)
+                .collect(Collectors.toList());
     }
 
 }

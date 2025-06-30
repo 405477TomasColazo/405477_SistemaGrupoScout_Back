@@ -18,7 +18,7 @@ import java.util.stream.Collectors;
 @Getter
 @Setter
 @Entity
-@Table(name = "users", schema = "jose_hernandez_db")
+@Table(name = "users")
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -72,7 +72,7 @@ public class User implements UserDetails {
 
     @Size(max = 100)
     @NotNull
-    @Column(name = "lastName", nullable = false, length = 100)
+    @Column(name = "last_name", nullable = false, length = 100)
     private String lastName;
 
     @Size(max = 255)
@@ -86,6 +86,18 @@ public class User implements UserDetails {
 
     @Column(name = "last_login")
     private Instant lastLogin;
+
+    @Size(max = 50)
+    @Column(name = "avatar", length = 50)
+    @ColumnDefault("'default'")
+    private String avatar;
+
+    @Size(max = 255)
+    @Column(name = "password_reset_token")
+    private String passwordResetToken;
+
+    @Column(name = "password_reset_token_expiry")
+    private Instant passwordResetTokenExpiry;
 
     @OneToMany(mappedBy = "user", fetch = FetchType.EAGER, cascade = CascadeType.ALL)
     private List<RolesXUser> rolesXUser = new ArrayList<>();

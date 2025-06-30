@@ -155,7 +155,7 @@ public class EventService {
         eventRepository.deleteById(id);
     }
 
-    private EventDTO convertToDTO(Event event) {
+    public EventDTO convertToDTO(Event event) {
         List<EventAttachmentDTO> attachmentDTOs = event.getAttachments() != null 
                 ? event.getAttachments().stream()
                     .map(this::convertAttachmentToDTO)

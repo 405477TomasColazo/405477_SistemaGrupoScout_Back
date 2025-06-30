@@ -10,7 +10,7 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity
-@Table(name = "invitations", schema = "jose_hernandez_db")
+@Table(name = "invitations")
 @Builder
 public class Invitation {
     @Id
@@ -21,6 +21,7 @@ public class Invitation {
     private String email;
 
     @NotNull
+    @Column(name = "last_name")
     private String lastName;
 
     @NotNull
@@ -29,5 +30,14 @@ public class Invitation {
     private Status status;
 
     @NotNull
+    @Column(name = "send_date")
     private LocalDateTime sendDate;
+
+    @NotNull
+    @Column(name = "user_type")
+    private String userType; // "FAMILY" or "EDUCATOR"
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "section_id")
+    private Section section; // Only for educators
 }

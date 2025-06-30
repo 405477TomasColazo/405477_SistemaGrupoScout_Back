@@ -13,7 +13,8 @@ import java.util.Map;
 @NoArgsConstructor
 @Builder
 public class ProcessPaymentRequest {
-    private Map<String, Object> cardFormData;
+    private Map<String, Object> paymentFormData; // Generic data for any payment method
     private String preferenceId;
     private List<Integer> feeIds;
+    private String paymentMethod; // Optional: card, bank_transfer, ticket, etc.
 }

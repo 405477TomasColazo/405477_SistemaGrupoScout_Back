@@ -8,13 +8,14 @@ import org.hibernate.annotations.ColumnDefault;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
 @Entity
-@Table(name = "members", schema = "jose_hernandez_db")
+@Table(name = "members")
 public class Member {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -90,5 +91,12 @@ public class Member {
     @Size(max = 255)
     @Column(name = "photo_url")
     private String photoUrl;
+
+    @ColumnDefault("true")
+    @Column(name = "is_active")
+    private Boolean isActive = true;
+
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
 }
