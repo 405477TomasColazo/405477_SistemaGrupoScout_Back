@@ -3,7 +3,8 @@ target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
-/src/main/resources/application.properties
+# Commented out to allow application.properties in repo
+# /src/main/resources/application.properties
 
 
 ### STS ###
@@ -14,7 +15,8 @@ target/
 .settings
 .springBeans
 .sts4-cache
-*.properties
+# Commented out to allow application.properties in repo
+# *.properties
 *.yml
 *.yaml
 
