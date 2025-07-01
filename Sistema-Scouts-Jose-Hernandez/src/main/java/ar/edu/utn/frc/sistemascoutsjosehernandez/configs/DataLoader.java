@@ -12,7 +12,6 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Arrays;
 
@@ -144,10 +143,9 @@ public class DataLoader {
         
         // Create admin user
         User adminUser = User.builder()
-            .email("admin@scouts.org")
+            .email("admin@scout.com")
             .lastName("Sistema")
-            .passwordHash(passwordEncoder.encode("admin123"))
-            .createdAt(Instant.now())
+            .passwordHash(passwordEncoder.encode("123"))
             .avatar("default")
             .build();
         
@@ -168,19 +166,23 @@ public class DataLoader {
         
         if (competenceRepository.count() == 0) {
             Competence comp1 = new Competence();
-            comp1.setDescription("Desarrollo personal");
+            comp1.setTitle("Desarrollo Personal");
+            comp1.setDescription("Competencia enfocada en el crecimiento personal y valores éticos del scout");
             comp1.setGrowthArea(GrowthArea.PEACE_DEVELOPMENT);
             
             Competence comp2 = new Competence();
-            comp2.setDescription("Cuidado de la salud");
+            comp2.setTitle("Cuidado de la Salud");
+            comp2.setDescription("Competencia relacionada con el bienestar físico y mental");
             comp2.setGrowthArea(GrowthArea.HEALTH_WELLBEING);
             
             Competence comp3 = new Competence();
-            comp3.setDescription("Cuidado del ambiente");
+            comp3.setTitle("Cuidado del Ambiente");
+            comp3.setDescription("Competencia sobre responsabilidad ambiental y sostenibilidad");
             comp3.setGrowthArea(GrowthArea.ENVIRONMENT);
             
             Competence comp4 = new Competence();
-            comp4.setDescription("Habilidades para la vida");
+            comp4.setTitle("Habilidades para la Vida");
+            comp4.setDescription("Competencia sobre destrezas prácticas y sociales");
             comp4.setGrowthArea(GrowthArea.LIFE_SKILLS);
             
             List<Competence> competences = Arrays.asList(comp1, comp2, comp3, comp4);
@@ -190,11 +192,11 @@ public class DataLoader {
             // Load suggested actions for each competence
             for (Competence competence : competences) {
                 SuggestedAction action1 = new SuggestedAction();
-                action1.setDescription("Acción sugerida 1 para " + competence.getDescription());
+                action1.setDescription("Acción sugerida 1 para " + competence.getTitle());
                 action1.setCompetence(competence);
                 
                 SuggestedAction action2 = new SuggestedAction();
-                action2.setDescription("Acción sugerida 2 para " + competence.getDescription());
+                action2.setDescription("Acción sugerida 2 para " + competence.getTitle());
                 action2.setCompetence(competence);
                 
                 suggestedActionRepository.saveAll(Arrays.asList(action1, action2));
