@@ -1,0 +1,13 @@
+[phases.build]
+dependsOn = ["setup"]
+cmds = ["cd Sistema-Scouts-Jose-Hernandez && ./mvnw clean package -DskipTests"]
+
+[phases.setup]
+nixPkgs = ["jdk21"]
+cmds = ["cd Sistema-Scouts-Jose-Hernandez && chmod +x mvnw"]
+
+[start]
+cmd = "cd Sistema-Scouts-Jose-Hernandez && java -jar target/*.jar"
+
+[variables]
+JAVA_HOME = "/nix/store/*-openjdk-21*/lib/openjdk"
