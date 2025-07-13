@@ -12,6 +12,7 @@ import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.UserRepository;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.news.NewsArticleRepository;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.news.NewsDistributionRepository;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.services.EmailService;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.services.NotificationService;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
@@ -36,6 +37,7 @@ public class NewsDistributionService {
     private final MemberRepository memberRepository;
     private final EmailService emailService;
     private final SectionRepository sectionRepository;
+    private final NotificationService notificationService;
 
     @PreAuthorize("hasRole('NEWS_MANAGER') or hasRole('ADMIN')")
     public NewsDistribution createDistribution(Integer articleId, List<DistributionFilter.FilterType> filterTypes, List<String> filterValues) {
@@ -85,6 +87,9 @@ public class NewsDistributionService {
             List<User> recipients = getRecipients(distribution.getFilters());
             
             emailService.sendBulkNewsNotification(recipients, distribution.getArticle());
+            
+            // Create in-app notifications for recipients
+            createNewsNotifications(recipients, distribution.getArticle());
             
             distribution.setStatus(NewsDistribution.DistributionStatus.SENT);
             distribution.setSentAt(LocalDateTime.now());
@@ -157,5 +162,16 @@ public class NewsDistributionService {
         return recipients.stream()
                 .filter(user -> user.getEmail() != null && !user.getEmail().isEmpty())
                 .collect(Collectors.toList());
+    }
+
+    private void createNewsNotifications(List<User> recipients, NewsArticle article) {
+        try {
+            for (User user : recipients) {
+                notificationService.createNewsAnnouncementNotification(user, article);
+            }
+        } catch (Exception e) {
+            // Log error but don't fail the distribution process
+            System.err.println("Error creating news notifications: " + e.getMessage());
+        }
     }
 }

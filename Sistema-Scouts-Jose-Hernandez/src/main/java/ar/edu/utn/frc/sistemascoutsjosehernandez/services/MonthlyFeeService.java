@@ -29,6 +29,7 @@ public class MonthlyFeeService {
     private final UserRepository userRepository;
     private final MemberTypeRepository memberTypeRepository;
     private final GlobalFeeConfigurationRepository globalFeeConfigurationRepository;
+    private final NotificationService notificationService;
 
     /**
      * Generates monthly fees for all active protagonists
@@ -80,6 +81,8 @@ public class MonthlyFeeService {
                         result.incrementFeesUpdated();
                     } else {
                         result.incrementFeesGenerated();
+                        // Create notification for new fee generated
+                        createMonthlyFeeNotification(member, month);
                     }
                 } catch (Exception e) {
                     log.error("Error processing member {}: {}", member.getId(), e.getMessage());
@@ -350,5 +353,30 @@ public class MonthlyFeeService {
 
         public String getMessage() { return message; }
         public void setMessage(String message) { this.message = message; }
+    }
+
+    /**
+     * Creates a notification when a new monthly fee is generated for a member
+     */
+    private void createMonthlyFeeNotification(Member member, String month) {
+        try {
+            if (member.getUser() != null) {
+                // This method is called when a new fee is created, so count is 1
+                int feeCount = 1;
+                
+                notificationService.createMonthlyFeeGeneratedNotification(
+                    member.getUser(), 
+                    month, 
+                    feeCount
+                );
+                
+                log.debug("Created fee generation notification for member {} ({}) for month {}", 
+                    member.getId(), member.getUser().getEmail(), month);
+            }
+        } catch (Exception e) {
+            // Log error but don't fail the fee generation process
+            log.error("Error creating fee generation notification for member {}: {}", 
+                member.getId(), e.getMessage());
+        }
     }
 }

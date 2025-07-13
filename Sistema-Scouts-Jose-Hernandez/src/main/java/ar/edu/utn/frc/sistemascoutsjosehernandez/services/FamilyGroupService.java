@@ -308,6 +308,10 @@ public class FamilyGroupService {
         relationshipRepository.delete(relationship);
     }
 
+    public boolean checkDniExists(String dni) {
+        return memberRepository.existsByDni(dni);
+    }
+
     private Section getSectionByAge(LocalDate birthdate) {
         LocalDate now = LocalDate.now();
         int age = Period.between(birthdate,now).getYears();

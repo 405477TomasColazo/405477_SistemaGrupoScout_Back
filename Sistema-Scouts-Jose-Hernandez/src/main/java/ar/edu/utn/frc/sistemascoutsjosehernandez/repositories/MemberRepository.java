@@ -43,4 +43,7 @@ public interface MemberRepository extends JpaRepository<Member, Integer> {
     
     @Query("SELECT m FROM Member m WHERE m.memberType.description = 'Tutor' AND m.isActive = true")
     List<Member> findActiveTutors();
+    
+    // Check if DNI exists for any member (active or inactive)
+    boolean existsByDni(String dni);
 }

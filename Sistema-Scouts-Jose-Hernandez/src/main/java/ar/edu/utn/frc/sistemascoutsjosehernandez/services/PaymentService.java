@@ -54,6 +54,7 @@ import com.itextpdf.kernel.font.PdfFontFactory;
 import com.itextpdf.kernel.font.PdfFont;
 import com.itextpdf.io.font.constants.StandardFonts;
 
+import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
@@ -71,6 +72,7 @@ public class PaymentService {
     private final EventRegistrationRepository eventRegistrationRepository;
     private final MemberRepository memberRepository;
     private final FamilyGroupRepository familyGroupRepository;
+    private final NotificationService notificationService;
 
     @PostConstruct
     public void init() {
@@ -332,6 +334,13 @@ public class PaymentService {
                 
                 updateEventRegistrationPaymentStatus(fee, newStatus, paymentId);
             }
+        }
+
+        // Create notifications for payment status changes
+        if (newStatus == PaymentStatus.COMPLETED && oldStatus != PaymentStatus.COMPLETED) {
+            createPaymentConfirmationNotification(payment);
+        } else if (newStatus == PaymentStatus.FAILED && oldStatus != PaymentStatus.FAILED) {
+            createPaymentFailedNotification(payment, reason != null ? reason : "Error en el procesamiento");
         }
 
         return mapToPaymentDTO(savedPayment);
@@ -738,6 +747,7 @@ public class PaymentService {
                 
                 // Only update if status actually changed
                 if (payment.getStatus() != newStatus) {
+                    PaymentStatus oldStatus = payment.getStatus();
                     payment.setStatus(newStatus);
                     // Note: PaymentMethod is an entity, not enum. We'd need to find or create the method
                     // For now, we'll skip updating payment method to avoid complexity
@@ -760,6 +770,15 @@ public class PaymentService {
                         if (item.getFee() != null) {
                             updateEventRegistrationPaymentStatus(item.getFee(), newStatus, payment.getId());
                         }
+                    }
+                    
+                    // Create notifications for payment status changes via webhook
+                    if (newStatus == PaymentStatus.COMPLETED && oldStatus != PaymentStatus.COMPLETED) {
+                        createPaymentConfirmationNotification(payment);
+                    } else if (newStatus == PaymentStatus.FAILED && oldStatus != PaymentStatus.FAILED) {
+                        String failureReason = mpPayment.getStatusDetail() != null ? 
+                            mpPayment.getStatusDetail() : "Error en el procesamiento del pago";
+                        createPaymentFailedNotification(payment, failureReason);
                     }
                     
                     System.out.println("Payment " + payment.getId() + " status updated to " + newStatus + " via webhook");
@@ -1068,6 +1087,15 @@ public class PaymentService {
             member.setAccountBalance(newMemberBalance);
             memberRepository.save(member);
 
+            // Create notification for successful balance application
+            if (balanceToUse.compareTo(BigDecimal.ZERO) > 0 && member.getUser() != null) {
+                notificationService.createBalanceAppliedNotification(
+                    member.getUser(), 
+                    feesPaidCompletely, 
+                    balanceToUse
+                );
+            }
+
             return ApplyBalanceResponse.builder()
                     .status("success")
                     .message("Balance aplicado exitosamente a las cuotas seleccionadas")
@@ -1087,5 +1115,51 @@ public class PaymentService {
                     .feesPaidCompletely(0)
                     .build();
         }
+    }
+
+    private void createPaymentConfirmationNotification(Payment payment) {
+        try {
+            if (payment.getMemberId() != null) {
+                Member member = memberRepository.findById(payment.getMemberId())
+                        .orElse(null);
+                if (member != null && member.getUser() != null) {
+                    NotificationType confirmationType = getOrCreateNotificationType("PAYMENT_CONFIRMATION");
+                    
+                    Notification notification = new Notification();
+                    notification.setUser(member.getUser());
+                    notification.setTitle("Pago confirmado");
+                    notification.setMessage(String.format("Tu pago por $%.2f ha sido confirmado exitosamente.", 
+                            payment.getAmount()));
+                    notification.setNotificationType(confirmationType);
+                    notification.setCreatedAt(Instant.now());
+                    notification.setRelatedEntity("PAYMENT");
+                    notification.setRelatedEntityId(payment.getId());
+                    
+                    notificationService.save(notification);
+                }
+            }
+        } catch (Exception e) {
+            // Log error but don't fail the payment process
+            System.err.println("Error creating payment confirmation notification: " + e.getMessage());
+        }
+    }
+
+    private void createPaymentFailedNotification(Payment payment, String reason) {
+        try {
+            if (payment.getMemberId() != null) {
+                Member member = memberRepository.findById(payment.getMemberId())
+                        .orElse(null);
+                if (member != null && member.getUser() != null) {
+                    notificationService.createPaymentFailedNotification(member.getUser(), payment, reason);
+                }
+            }
+        } catch (Exception e) {
+            // Log error but don't fail the payment process
+            System.err.println("Error creating payment failed notification: " + e.getMessage());
+        }
+    }
+    
+    private NotificationType getOrCreateNotificationType(String typeName) {
+        return notificationService.getOrCreateNotificationType(typeName);
     }
 }
