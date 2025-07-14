@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.sistemascoutsjosehernandez.controllers;
 
+import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.FeeGenerationLogDto;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.FeeGenerationLog;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.User;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.Section;
@@ -25,6 +26,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/admin/monthly-fees")
@@ -55,7 +57,7 @@ public class MonthlyFeeController {
             }
             
             return ResponseEntity.ok(Map.of(
-                "message", "Monthly fees generated successfully",
+                "message", "Cuotas mensuales generadas exitosamente",
                 "membersProcessed", result.getMembersProcessed(),
                 "feesGenerated", result.getFeesGenerated(),
                 "feesUpdated", result.getFeesUpdated(),
@@ -90,7 +92,7 @@ public class MonthlyFeeController {
             }
             
             return ResponseEntity.ok(Map.of(
-                "message", "Monthly fees generated successfully",
+                "message", "Cuotas mensuales generadas exitosamente",
                 "totalGenerated", result.getFeesGenerated() + result.getFeesUpdated(),
                 "month", request.getTargetMonth()
             ));
@@ -105,7 +107,7 @@ public class MonthlyFeeController {
         BigDecimal currentPrice = monthlyFeeService.getCurrentGlobalFeePrice();
         return ResponseEntity.ok(Map.of(
             "monthlyFeeAmount", currentPrice,
-            "message", "Current global monthly fee price"
+            "message", "Precio actual de cuota mensual global"
         ));
     }
 
@@ -162,8 +164,13 @@ public class MonthlyFeeController {
             );
         }
         
+        // Convert entities to DTOs
+        List<FeeGenerationLogDto> logDtos = logsPage.getContent().stream()
+            .map(FeeGenerationLogDto::fromEntity)
+            .collect(Collectors.toList());
+        
         return ResponseEntity.ok(Map.of(
-            "logs", logsPage.getContent(),
+            "logs", logDtos,
             "total", logsPage.getTotalElements()
         ));
     }
