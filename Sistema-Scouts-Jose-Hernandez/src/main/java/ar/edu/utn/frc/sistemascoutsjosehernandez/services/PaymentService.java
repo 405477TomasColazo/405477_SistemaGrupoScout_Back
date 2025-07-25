@@ -169,7 +169,7 @@ public class PaymentService {
                     .paymentDate(LocalDate.now().toString())
                     .status(mapMercadoPagoStatus(mpPayment.getStatus()))
                     .referenceId(mpPayment.getId().toString())
-                    .paymentMethod(mpPayment.getPaymentMethodId())
+                    .paymentMethod(paymentMethodType) // Usar el tipo detectado en lugar del ID de MercadoPago
                     .build();
 
             List<PaymentItem> items = createPaymentItemsFromFees(request.getFeeIds());
@@ -216,66 +216,42 @@ public class PaymentService {
     public PaymentsHistoryResponse getPaymentsHistory(PaymentFilters filters, int page, int limit) {
         PageRequest pageRequest = PageRequest.of(page, limit);
         
-        // Get current user and check if they are admin
+        // Get current user 
         String currentUserEmail = getCurrentUserEmail();
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         
-        boolean isAdmin = currentUser.getRolesXUser().stream()
-                .anyMatch(roleXUser -> roleXUser.getRole().getDescription().equals("ROLE_ADMIN"));
-        
-        Page<Payment> paymentsPage;
-        
-        if (isAdmin) {
-            // Admin can see all payments
-            paymentsPage = paymentRepository.findByFilters(
-                    filters.getMemberId(),
-                    filters.getDateFrom(),
-                    filters.getDateTo(),
-                    filters.getMinAmount(),
-                    pageRequest
-            );
-        } else {
-            // Non-admin users can only see payments from their family
-            FamilyGroup familyGroup = familyGroupRepository.findFamilyGroupsByUser_Id(currentUser.getId());
-            if (familyGroup == null) {
-                throw new RuntimeException("Family group not found");
-            }
-            
-            List<Integer> familyMemberIds = memberRepository.findAllByFamilyGroup_Id(familyGroup.getId())
-                    .stream()
-                    .map(Member::getId)
-                    .collect(Collectors.toList());
-            
-            // Filter payments to only include family members
-            paymentsPage = paymentRepository.findByFilters(
-                    filters.getMemberId(),
-                    filters.getDateFrom(),
-                    filters.getDateTo(),
-                    filters.getMinAmount(),
-                    pageRequest
-            );
-            
-            // Additional filtering by family members
-            paymentsPage = paymentsPage.map(payment -> {
-                if (familyMemberIds.contains(payment.getMemberId())) {
-                    return payment;
-                }
-                return null;
-            });
-            
-            // Remove null entries
-            List<Payment> filteredPayments = paymentsPage.getContent().stream()
-                    .filter(payment -> payment != null && familyMemberIds.contains(payment.getMemberId()))
-                    .collect(Collectors.toList());
-            
-            // Create new page with filtered results
-            paymentsPage = new org.springframework.data.domain.PageImpl<>(
-                    filteredPayments,
-                    pageRequest,
-                    filteredPayments.size()
-            );
+        // All users (including admins) can only see payments from their family
+        FamilyGroup familyGroup = familyGroupRepository.findFamilyGroupsByUser_Id(currentUser.getId());
+        if (familyGroup == null) {
+            throw new RuntimeException("Family group not found");
         }
+        
+        List<Integer> familyMemberIds = memberRepository.findAllByFamilyGroup_Id(familyGroup.getId())
+                .stream()
+                .map(Member::getId)
+                .collect(Collectors.toList());
+        
+        // Filter payments to only include family members
+        Page<Payment> paymentsPage = paymentRepository.findByFilters(
+                filters.getMemberId(),
+                filters.getDateFrom(),
+                filters.getDateTo(),
+                filters.getMinAmount(),
+                pageRequest
+        );
+        
+        // Additional filtering by family members
+        List<Payment> filteredPayments = paymentsPage.getContent().stream()
+                .filter(payment -> payment != null && familyMemberIds.contains(payment.getMemberId()))
+                .collect(Collectors.toList());
+        
+        // Create new page with filtered results
+        paymentsPage = new org.springframework.data.domain.PageImpl<>(
+                filteredPayments,
+                pageRequest,
+                filteredPayments.size()
+        );
 
         List<PaymentDto> paymentDTOs = paymentsPage.getContent().stream()
                 .map(this::mapToPaymentDTO)
@@ -556,7 +532,7 @@ public class PaymentService {
         dto.setPaymentDate(savedPayment.getPaymentDate());
         dto.setStatus(savedPayment.getStatus().name().toLowerCase());
         dto.setReferenceId(savedPayment.getReferenceId());
-        dto.setPaymentMethod(savedPayment.getPaymentMethod());
+        dto.setPaymentMethod(getPaymentMethodInSpanish(savedPayment.getPaymentMethod()));
         dto.setItems(itemDTOS);
         return dto;
     }
@@ -606,6 +582,69 @@ public class PaymentService {
         }
         
         return "card"; // Default to card for backward compatibility
+    }
+    
+    private String getPaymentMethodInSpanish(String paymentMethod) {
+        if (paymentMethod == null) return "N/A";
+        
+        String method = paymentMethod.toLowerCase();
+        
+        // Tipos de pago detectados
+        switch (method) {
+            case "card":
+                return "Tarjeta de crédito/débito";
+            case "ticket":
+                return "Efectivo";
+            case "bank_transfer":
+                return "Transferencia bancaria";
+            case "digital_wallet":
+                return "Billetera digital";
+            case "account_money":
+                return "Dinero en cuenta";
+            case "atm":
+                return "Cajero automático";
+            
+            // IDs específicos de MercadoPago (para pagos ya existentes)
+            case "visa":
+                return "Tarjeta Visa";
+            case "mastercard":
+            case "master":
+                return "Tarjeta Mastercard";
+            case "american_express":
+            case "amex":
+                return "Tarjeta American Express";
+            case "credit_card":
+                return "Tarjeta de crédito";
+            case "debit_card":
+                return "Tarjeta de débito";
+            case "pix":
+                return "PIX";
+            case "rapipago":
+                return "RapiPago";
+            case "pagofacil":
+                return "PagoFácil";
+            case "bacs":
+                return "Transferencia bancaria";
+            case "wire_transfer":
+                return "Transferencia bancaria";
+            
+            // Para casos no reconocidos, intentar identificar el tipo
+            default:
+                // Si contiene ciertos términos, intentar clasificar
+                if (method.contains("card") || method.contains("visa") || method.contains("master") || 
+                    method.contains("amex") || method.contains("credit") || method.contains("debit")) {
+                    return "Tarjeta de crédito/débito";
+                }
+                if (method.contains("bank") || method.contains("transfer") || method.contains("wire")) {
+                    return "Transferencia bancaria";
+                }
+                if (method.contains("cash") || method.contains("efectivo") || method.contains("ticket")) {
+                    return "Efectivo";
+                }
+                
+                // Si no podemos identificar, retornar el valor original formateado
+                return paymentMethod.substring(0, 1).toUpperCase() + paymentMethod.substring(1).toLowerCase();
+        }
     }
     
     private PaymentCreateRequest buildPaymentRequest(ProcessPaymentRequest request, String paymentMethodType) {
