@@ -26,6 +26,7 @@ import com.mercadopago.exceptions.MPException;
 import com.mercadopago.resources.preference.Preference;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -58,6 +59,7 @@ import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PaymentService {
 
     @Value("${token.mp}")
@@ -601,6 +603,8 @@ public class PaymentService {
                 return "Billetera digital";
             case "account_money":
                 return "Dinero en cuenta";
+            case "account_balance":
+                return "Balance de cuenta";
             case "atm":
                 return "Cajero automático";
             
@@ -1091,9 +1095,20 @@ public class PaymentService {
             BigDecimal balanceToUse = currentBalance.min(totalFeesAmount);
             BigDecimal remainingAmount = totalFeesAmount.subtract(balanceToUse);
             
-            // Apply balance proportionally to each fee
+            // Create Payment record for the balance transaction
+            Payment payment = Payment.builder()
+                    .memberId(member.getId())
+                    .amount(balanceToUse)
+                    .paymentDate(LocalDate.now().toString())
+                    .status(PaymentStatus.COMPLETED)
+                    .referenceId("BALANCE_" + System.currentTimeMillis())
+                    .paymentMethod("ACCOUNT_BALANCE")
+                    .build();
+            
+            // Apply balance proportionally to each fee and create payment items
             BigDecimal remainingBalance = balanceToUse;
             List<FeeDto> updatedFees = new ArrayList<>();
+            List<PaymentItem> paymentItems = new ArrayList<>();
             int feesPaidCompletely = 0;
 
             for (Fee fee : fees) {
@@ -1105,6 +1120,18 @@ public class PaymentService {
                 BigDecimal discountForThisFee = remainingBalance.min(originalAmount);
                 BigDecimal newAmount = originalAmount.subtract(discountForThisFee);
                 
+                // Create PaymentItem for the portion paid with balance
+                if (discountForThisFee.compareTo(BigDecimal.ZERO) > 0) {
+                    PaymentItem paymentItem = PaymentItem.builder()
+                            .fee(fee)
+                            .description(fee.getDescription())
+                            .period(fee.getPeriod())
+                            .amount(discountForThisFee)
+                            .payment(payment)
+                            .build();
+                    paymentItems.add(paymentItem);
+                }
+                
                 // Update fee amount
                 fee.setAmount(newAmount);
                 
@@ -1112,6 +1139,9 @@ public class PaymentService {
                 if (newAmount.compareTo(BigDecimal.ZERO) == 0) {
                     fee.setStatus(PaymentStatus.COMPLETED);
                     feesPaidCompletely++;
+                    
+                    // Update EventRegistration payment status if this fee is for an event
+                    updateEventRegistrationPaymentStatus(fee, PaymentStatus.COMPLETED, null);
                 }
                 
                 feeRepository.save(fee);
@@ -1119,6 +1149,17 @@ public class PaymentService {
                 
                 // Add to updated fees list
                 updatedFees.add(toFeeDto(fee));
+            }
+            
+            // Set payment items and save payment
+            payment.setItems(paymentItems);
+            Payment savedPayment = paymentRepository.save(payment);
+            
+            // Update event registrations with the payment ID for completed fees
+            for (PaymentItem item : paymentItems) {
+                if (item.getFee().getStatus() == PaymentStatus.COMPLETED) {
+                    updateEventRegistrationPaymentStatus(item.getFee(), PaymentStatus.COMPLETED, savedPayment.getId().intValue());
+                }
             }
 
             // Update member's balance
