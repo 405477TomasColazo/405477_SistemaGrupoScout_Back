@@ -31,6 +31,10 @@ public class SecurityUtils {
         return getCurrentUser().getId();
     }
 
+    public static String getCurrentUserEmail() {
+        return getCurrentUser().getEmail();
+    }
+
     public boolean hasRole(String role) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         return auth.getAuthorities().contains(new SimpleGrantedAuthority("ROLE_" + role));

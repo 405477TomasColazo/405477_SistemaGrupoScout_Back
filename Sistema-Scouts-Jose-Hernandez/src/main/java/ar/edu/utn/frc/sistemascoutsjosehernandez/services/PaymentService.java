@@ -12,6 +12,7 @@ import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.PaymentRepository;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.UserRepository;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.MemberRepository;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.FamilyGroupRepository;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.services.accounting.AccountingService;
 
 import com.mercadopago.MercadoPagoConfig;
 import com.mercadopago.client.payment.PaymentClient;
@@ -75,6 +76,7 @@ public class PaymentService {
     private final MemberRepository memberRepository;
     private final FamilyGroupRepository familyGroupRepository;
     private final NotificationService notificationService;
+    private final AccountingService accountingService;
 
     @PostConstruct
     public void init() {
@@ -192,6 +194,24 @@ public class PaymentService {
                     }
 
                 }
+
+            // Create accounting entry for completed payments
+            if (mpPayment.getStatus().equalsIgnoreCase("approved")) {
+                try {
+                    String description = buildPaymentDescription(savedPayment);
+                    accountingService.createAutomaticPaymentEntry(
+                        savedPayment.getId().toString(),
+                        savedPayment.getAmount(),
+                        description,
+                        paymentMethodType
+                    );
+                    log.info("Created accounting entry for payment: {}", savedPayment.getId());
+                } catch (Exception e) {
+                    log.error("Failed to create accounting entry for payment {}: {}", 
+                             savedPayment.getId(), e.getMessage());
+                    // Don't fail the payment if accounting fails
+                }
+            }
 
             ProcessPaymentResponse response = new ProcessPaymentResponse();
             if (mpPayment.getStatus().equalsIgnoreCase("approved")) {
@@ -818,6 +838,22 @@ public class PaymentService {
                     // Create notifications for payment status changes via webhook
                     if (newStatus == PaymentStatus.COMPLETED && oldStatus != PaymentStatus.COMPLETED) {
                         createPaymentConfirmationNotification(payment);
+                        
+                        // Create accounting entry for newly completed payments
+                        try {
+                            String description = buildPaymentDescription(payment);
+                            accountingService.createAutomaticPaymentEntry(
+                                payment.getId().toString(),
+                                payment.getAmount(),
+                                description,
+                                payment.getPaymentMethod()
+                            );
+                            log.info("Created accounting entry for webhook payment: {}", payment.getId());
+                        } catch (Exception e) {
+                            log.error("Failed to create accounting entry for webhook payment {}: {}", 
+                                     payment.getId(), e.getMessage());
+                            // Don't fail the webhook if accounting fails
+                        }
                     } else if (newStatus == PaymentStatus.FAILED && oldStatus != PaymentStatus.FAILED) {
                         String failureReason = mpPayment.getStatusDetail() != null ? 
                             mpPayment.getStatusDetail() : "Error en el procesamiento del pago";
@@ -1241,5 +1277,48 @@ public class PaymentService {
     
     private NotificationType getOrCreateNotificationType(String typeName) {
         return notificationService.getOrCreateNotificationType(typeName);
+    }
+
+    private String buildPaymentDescription(Payment payment) {
+        if (payment.getItems() == null || payment.getItems().isEmpty()) {
+            return "Payment received";
+        }
+
+        // Build description based on payment items
+        StringBuilder description = new StringBuilder();
+        boolean hasMonthlyFees = false;
+        boolean hasEventFees = false;
+
+        for (PaymentItem item : payment.getItems()) {
+            if (item.getDescription() != null) {
+                if (item.getDescription().toLowerCase().contains("cuota") || 
+                    item.getDescription().toLowerCase().contains("monthly")) {
+                    hasMonthlyFees = true;
+                } else if (item.getDescription().toLowerCase().contains("evento") || 
+                          item.getDescription().toLowerCase().contains("event")) {
+                    hasEventFees = true;
+                }
+            }
+        }
+
+        if (hasMonthlyFees && hasEventFees) {
+            description.append("Monthly fees and event payments");
+        } else if (hasMonthlyFees) {
+            description.append("Monthly fee payment");
+        } else if (hasEventFees) {
+            description.append("Event payment");
+        } else {
+            description.append("Payment received");
+        }
+
+        // Add member information if available
+        if (payment.getMemberId() != null) {
+            Member member = memberRepository.findById(payment.getMemberId()).orElse(null);
+            if (member != null) {
+                description.append(" - ").append(member.getName()).append(" ").append(member.getLastname());
+            }
+        }
+
+        return description.toString();
     }
 }
