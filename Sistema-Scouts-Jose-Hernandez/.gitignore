@@ -3,9 +3,12 @@ target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
-# Commented out to allow application.properties in repo
-# /src/main/resources/application.properties
 
+# Configuration files with sensitive data
+/src/main/resources/application.properties
+
+# DataLoader with sensitive personal information
+/src/main/java/ar/edu/utn/frc/sistemascoutsjosehernandez/configs/DataLoader.java
 
 ### STS ###
 .apt_generated
@@ -15,8 +18,7 @@ target/
 .settings
 .springBeans
 .sts4-cache
-# Commented out to allow application.properties in repo
-# *.properties
+*.properties
 *.yml
 *.yaml
 
