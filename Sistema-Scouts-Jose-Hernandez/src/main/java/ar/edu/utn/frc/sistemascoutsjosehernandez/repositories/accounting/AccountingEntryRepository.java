@@ -26,18 +26,22 @@ public interface AccountingEntryRepository extends JpaRepository<AccountingEntry
     @Query("SELECT MAX(ae.entryNumber) FROM AccountingEntry ae")
     Optional<Integer> findMaxEntryNumber();
     
-    @Query("SELECT ae FROM AccountingEntry ae WHERE " +
+    @Query("SELECT DISTINCT ae FROM AccountingEntry ae " +
+           "LEFT JOIN ae.movements m " +
+           "WHERE " +
            "(:dateFrom IS NULL OR ae.entryDate >= :dateFrom) AND " +
            "(:dateTo IS NULL OR ae.entryDate <= :dateTo) AND " +
            "(:status IS NULL OR ae.status = :status) AND " +
            "(:originType IS NULL OR ae.originType = :originType) AND " +
-           "(:description IS NULL OR UPPER(ae.description) LIKE UPPER(CONCAT('%', :description, '%'))) " +
+           "(:description IS NULL OR UPPER(ae.description) LIKE UPPER(CONCAT('%', :description, '%'))) AND " +
+           "(:accountId IS NULL OR m.account.id = :accountId) " +
            "ORDER BY ae.entryDate DESC, ae.entryNumber DESC")
     Page<AccountingEntry> findEntriesWithFilters(@Param("dateFrom") LocalDate dateFrom,
                                                 @Param("dateTo") LocalDate dateTo,
                                                 @Param("status") EntryStatus status,
                                                 @Param("originType") OriginType originType,
                                                 @Param("description") String description,
+                                                @Param("accountId") Long accountId,
                                                 Pageable pageable);
     
     @Query("SELECT ae FROM AccountingEntry ae " +

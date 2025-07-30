@@ -17,6 +17,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -223,25 +224,73 @@ public class AccountingController {
             // Default to current month if no dates provided
             LocalDate startDate = dateFrom != null ? dateFrom : LocalDate.now().withDayOfMonth(1);
             LocalDate endDate = dateTo != null ? dateTo : LocalDate.now();
+            
+            log.debug("Getting dashboard stats for period: {} to {}", startDate, endDate);
 
-            // Generate both reports to get comprehensive stats
-            AccountingReportDto journalReport = accountingService.generateJournalReport(startDate, endDate);
-            AccountingReportDto balanceReport = accountingService.generateBalanceReport(startDate, endDate);
-
+            // Initialize stats with default values
             AccountingDashboardStatsDto stats = AccountingDashboardStatsDto.builder()
                     .periodStart(startDate)
                     .periodEnd(endDate)
-                    .totalEntries(journalReport.getEntries() != null ? journalReport.getEntries().size() : 0)
-                    .totalDebits(journalReport.getTotalDebits())
-                    .totalCredits(journalReport.getTotalCredits())
-                    .balanceDifference(journalReport.getBalanceDifference())
-                    .accountsWithMovements(balanceReport.getAccountBalances() != null ? balanceReport.getAccountBalances().size() : 0)
+                    .totalEntries(0)
+                    .totalDebits(BigDecimal.ZERO)
+                    .totalCredits(BigDecimal.ZERO)
+                    .balanceDifference(BigDecimal.ZERO)
+                    .accountsWithMovements(0)
                     .build();
+
+            try {
+                // Try to generate reports, but don't fail if no data exists
+                AccountingReportDto journalReport = accountingService.generateJournalReport(startDate, endDate);
+                if (journalReport != null) {
+                    stats = AccountingDashboardStatsDto.builder()
+                            .periodStart(stats.getPeriodStart())
+                            .periodEnd(stats.getPeriodEnd())
+                            .totalEntries(journalReport.getEntries() != null ? journalReport.getEntries().size() : 0)
+                            .totalDebits(journalReport.getTotalDebits() != null ? journalReport.getTotalDebits() : BigDecimal.ZERO)
+                            .totalCredits(journalReport.getTotalCredits() != null ? journalReport.getTotalCredits() : BigDecimal.ZERO)
+                            .balanceDifference(journalReport.getBalanceDifference() != null ? journalReport.getBalanceDifference() : BigDecimal.ZERO)
+                            .accountsWithMovements(stats.getAccountsWithMovements())
+                            .automaticEntries(stats.getAutomaticEntries())
+                            .manualEntries(stats.getManualEntries())
+                            .build();
+                }
+            } catch (Exception e) {
+                log.warn("Could not generate journal report for dashboard: {}", e.getMessage());
+            }
+
+            try {
+                AccountingReportDto balanceReport = accountingService.generateBalanceReport(startDate, endDate);
+                if (balanceReport != null && balanceReport.getAccountBalances() != null) {
+                    stats = AccountingDashboardStatsDto.builder()
+                            .periodStart(stats.getPeriodStart())
+                            .periodEnd(stats.getPeriodEnd())
+                            .totalEntries(stats.getTotalEntries())
+                            .totalDebits(stats.getTotalDebits())
+                            .totalCredits(stats.getTotalCredits())
+                            .balanceDifference(stats.getBalanceDifference())
+                            .accountsWithMovements(balanceReport.getAccountBalances().size())
+                            .automaticEntries(stats.getAutomaticEntries())
+                            .manualEntries(stats.getManualEntries())
+                            .build();
+                }
+            } catch (Exception e) {
+                log.warn("Could not generate balance report for dashboard: {}", e.getMessage());
+            }
 
             return ResponseEntity.ok(stats);
         } catch (Exception e) {
-            log.error("Error retrieving dashboard stats: {}", e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            log.error("Error retrieving dashboard stats: ", e);
+            // Return empty stats instead of error
+            AccountingDashboardStatsDto emptyStats = AccountingDashboardStatsDto.builder()
+                    .periodStart(dateFrom != null ? dateFrom : LocalDate.now().withDayOfMonth(1))
+                    .periodEnd(dateTo != null ? dateTo : LocalDate.now())
+                    .totalEntries(0)
+                    .totalDebits(BigDecimal.ZERO)
+                    .totalCredits(BigDecimal.ZERO)
+                    .balanceDifference(BigDecimal.ZERO)
+                    .accountsWithMovements(0)
+                    .build();
+            return ResponseEntity.ok(emptyStats);
         }
     }
 }

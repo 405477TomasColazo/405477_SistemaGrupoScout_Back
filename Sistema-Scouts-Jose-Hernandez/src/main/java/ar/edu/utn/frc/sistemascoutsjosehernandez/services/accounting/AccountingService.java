@@ -69,6 +69,7 @@ public class AccountingService {
                 filters.getStatus(),
                 filters.getOriginType(),
                 filters.getDescription(),
+                filters.getAccountId(),
                 pageable
         );
 
@@ -166,14 +167,14 @@ public class AccountingService {
                         .account(debitAccount)
                         .movementType(MovementType.DEBIT)
                         .amount(amount)
-                        .description("Payment received - " + paymentMethod)
+                        .description("Pago recibido - " + paymentMethod)
                         .build(),
                 AccountingMovement.builder()
                         .accountingEntry(entry)
                         .account(creditAccount)
                         .movementType(MovementType.CREDIT)
                         .amount(amount)
-                        .description("Income from " + description)
+                        .description("Ingreso por " + description)
                         .build()
         );
 
@@ -210,7 +211,7 @@ public class AccountingService {
         AccountingEntry cancellationEntry = AccountingEntry.builder()
                 .entryNumber(nextEntryNumber)
                 .entryDate(LocalDate.now())
-                .description("Cancellation of entry #" + entry.getEntryNumber() + " - " + reason)
+                .description("Anulación de asiento #" + entry.getEntryNumber() + " - " + reason)
                 .originType(OriginType.MANUAL)
                 .status(EntryStatus.ACTIVE)
                 .createdByUser(getCurrentUser())
@@ -224,7 +225,7 @@ public class AccountingService {
                         .movementType(originalMovement.getMovementType() == MovementType.DEBIT ? 
                                      MovementType.CREDIT : MovementType.DEBIT)
                         .amount(originalMovement.getAmount())
-                        .description("Reversal: " + originalMovement.getDescription())
+                        .description("Reversión: " + originalMovement.getDescription())
                         .build())
                 .collect(Collectors.toList());
 
@@ -245,8 +246,24 @@ public class AccountingService {
         List<AccountingEntry> entries = entryRepository.findEntriesForPeriod(startDate, endDate);
         Object[] totals = entryRepository.getTotalsForPeriod(startDate, endDate);
 
-        BigDecimal totalDebits = totals[0] != null ? (BigDecimal) totals[0] : BigDecimal.ZERO;
-        BigDecimal totalCredits = totals[1] != null ? (BigDecimal) totals[1] : BigDecimal.ZERO;
+        BigDecimal totalDebits = BigDecimal.ZERO;
+        BigDecimal totalCredits = BigDecimal.ZERO;
+
+        if (totals != null && totals.length > 0 && totals[0] instanceof Object[]) {
+            Object[] values = (Object[]) totals[0];
+
+            if (values.length >= 2) {
+                if (values[0] != null) {
+                    totalDebits = values[0] instanceof BigDecimal ? (BigDecimal) values[0] :
+                            new BigDecimal(values[0].toString());
+                }
+                if (values[1] != null) {
+                    totalCredits = values[1] instanceof BigDecimal ? (BigDecimal) values[1] :
+                            new BigDecimal(values[1].toString());
+                }
+            }
+        }
+
 
         return AccountingReportDto.builder()
                 .reportType("JOURNAL")
@@ -267,9 +284,12 @@ public class AccountingService {
                         .accountId((Long) data[0])
                         .accountCode((String) data[1])
                         .accountName((String) data[2])
-                        .totalDebits((BigDecimal) data[3])
-                        .totalCredits((BigDecimal) data[4])
-                        .balance((BigDecimal) data[5])
+                        .totalDebits(data[3] instanceof BigDecimal ? (BigDecimal) data[3] : 
+                                   data[3] != null ? new BigDecimal(data[3].toString()) : BigDecimal.ZERO)
+                        .totalCredits(data[4] instanceof BigDecimal ? (BigDecimal) data[4] : 
+                                    data[4] != null ? new BigDecimal(data[4].toString()) : BigDecimal.ZERO)
+                        .balance(data[5] instanceof BigDecimal ? (BigDecimal) data[5] : 
+                               data[5] != null ? new BigDecimal(data[5].toString()) : BigDecimal.ZERO)
                         .build())
                 .collect(Collectors.toList());
 

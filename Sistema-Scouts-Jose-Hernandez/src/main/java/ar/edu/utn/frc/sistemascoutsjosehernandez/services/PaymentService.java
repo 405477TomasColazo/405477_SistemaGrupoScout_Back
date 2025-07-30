@@ -39,6 +39,7 @@ import javax.annotation.PostConstruct;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -170,7 +171,7 @@ public class PaymentService {
             Payment payment = Payment.builder()
                     .memberId(getMemberIdFromFees(request.getFeeIds()))
                     .amount(mpPayment.getTransactionAmount())
-                    .paymentDate(LocalDate.now().toString())
+                    .paymentDate(getCurrentDateInArgentina())
                     .status(mapMercadoPagoStatus(mpPayment.getStatus()))
                     .referenceId(mpPayment.getId().toString())
                     .paymentMethod(paymentMethodType) // Usar el tipo detectado en lugar del ID de MercadoPago
@@ -391,8 +392,8 @@ public class PaymentService {
             addTableRow(paymentTable, "Fecha:", payment.getPaymentDate() != null ? payment.getPaymentDate().toString() : "N/A", boldFont, regularFont);
             addTableRow(paymentTable, "Protagonista:", memberName, boldFont, regularFont);
             addTableRow(paymentTable, "Monto Total:", "$" + payment.getAmount(), boldFont, regularFont);
-            addTableRow(paymentTable, "Estado:", payment.getStatus().toString(), boldFont, regularFont);
-            addTableRow(paymentTable, "Método:", payment.getPaymentMethod() != null ? payment.getPaymentMethod() : "N/A", boldFont, regularFont);
+            addTableRow(paymentTable, "Estado:", getPaymentStatusInSpanish(payment.getStatus()), boldFont, regularFont);
+            addTableRow(paymentTable, "Método:", getPaymentMethodInSpanish(payment.getPaymentMethod()), boldFont, regularFont);
             
             document.add(paymentTable);
             document.add(new Paragraph("\n"));
@@ -466,8 +467,8 @@ public class PaymentService {
         content.append("Fecha: ").append(payment.getPaymentDate() != null ? payment.getPaymentDate() : "N/A").append("\n");
         content.append("Beneficiario: ").append(memberName).append("\n");
         content.append("Monto Total: $").append(payment.getAmount()).append("\n");
-        content.append("Estado: ").append(payment.getStatus()).append("\n");
-        content.append("Método: ").append(payment.getPaymentMethod() != null ? payment.getPaymentMethod() : "N/A").append("\n\n");
+        content.append("Estado: ").append(getPaymentStatusInSpanish(payment.getStatus())).append("\n");
+        content.append("Método: ").append(getPaymentMethodInSpanish(payment.getPaymentMethod())).append("\n\n");
         
         content.append("==========================================\n");
         content.append("CONCEPTOS PAGADOS\n");
@@ -604,6 +605,27 @@ public class PaymentService {
         }
         
         return "card"; // Default to card for backward compatibility
+    }
+    
+    private String getPaymentStatusInSpanish(PaymentStatus status) {
+        if (status == null) return "N/A";
+        
+        switch (status) {
+            case COMPLETED:
+                return "Completado";
+            case PENDING:
+                return "Pendiente";
+            case FAILED:
+                return "Fallido";
+            case REFUNDED:
+                return "Reembolsado";
+            case PROCESSING:
+                return "Procesando";
+            case UNKNOWN:
+                return "Desconocido";
+            default:
+                return status.toString();
+        }
     }
     
     private String getPaymentMethodInSpanish(String paymentMethod) {
@@ -1135,7 +1157,7 @@ public class PaymentService {
             Payment payment = Payment.builder()
                     .memberId(member.getId())
                     .amount(balanceToUse)
-                    .paymentDate(LocalDate.now().toString())
+                    .paymentDate(getCurrentDateInArgentina())
                     .status(PaymentStatus.COMPLETED)
                     .referenceId("BALANCE_" + System.currentTimeMillis())
                     .paymentMethod("ACCOUNT_BALANCE")
@@ -1202,6 +1224,24 @@ public class PaymentService {
             BigDecimal newMemberBalance = currentBalance.subtract(balanceToUse);
             member.setAccountBalance(newMemberBalance);
             memberRepository.save(member);
+
+            // Create accounting entry for balance payment
+            if (balanceToUse.compareTo(BigDecimal.ZERO) > 0) {
+                try {
+                    String description = buildBalancePaymentDescription(member, updatedFees, feesPaidCompletely);
+                    accountingService.createAutomaticPaymentEntry(
+                        savedPayment.getId().toString(),
+                        balanceToUse,
+                        description,
+                        "ACCOUNT_BALANCE"
+                    );
+                    log.info("Created accounting entry for balance payment: {}", savedPayment.getId());
+                } catch (Exception e) {
+                    log.error("Failed to create accounting entry for balance payment {}: {}", 
+                             savedPayment.getId(), e.getMessage());
+                    // Don't fail the balance application if accounting fails
+                }
+            }
 
             // Create notification for successful balance application
             if (balanceToUse.compareTo(BigDecimal.ZERO) > 0 && member.getUser() != null) {
@@ -1281,7 +1321,7 @@ public class PaymentService {
 
     private String buildPaymentDescription(Payment payment) {
         if (payment.getItems() == null || payment.getItems().isEmpty()) {
-            return "Payment received";
+            return "Pago recibido";
         }
 
         // Build description based on payment items
@@ -1302,13 +1342,13 @@ public class PaymentService {
         }
 
         if (hasMonthlyFees && hasEventFees) {
-            description.append("Monthly fees and event payments");
+            description.append("Cuotas mensuales y pagos de eventos");
         } else if (hasMonthlyFees) {
-            description.append("Monthly fee payment");
+            description.append("Pago de cuota mensual");
         } else if (hasEventFees) {
-            description.append("Event payment");
+            description.append("Pago de evento");
         } else {
-            description.append("Payment received");
+            description.append("Pago recibido");
         }
 
         // Add member information if available
@@ -1320,5 +1360,51 @@ public class PaymentService {
         }
 
         return description.toString();
+    }
+
+    private String buildBalancePaymentDescription(Member member, List<FeeDto> updatedFees, int feesPaidCompletely) {
+        StringBuilder description = new StringBuilder();
+        description.append("Aplicación de saldo");
+        
+        if (member != null) {
+            description.append(" - ").append(member.getName()).append(" ").append(member.getLastname());
+        }
+        
+        if (feesPaidCompletely > 0) {
+            description.append(" (").append(feesPaidCompletely).append(" cuota");
+            if (feesPaidCompletely > 1) {
+                description.append("s");
+            }
+            description.append(" pagadas completamente)");
+        }
+        
+        // Add fee types for context
+        boolean hasMonthlyFees = updatedFees.stream()
+            .anyMatch(fee -> fee.getDescription() != null && 
+                      (fee.getDescription().toLowerCase().contains("cuota") || 
+                       fee.getDescription().toLowerCase().contains("monthly")));
+        boolean hasEventFees = updatedFees.stream()
+            .anyMatch(fee -> fee.getDescription() != null && 
+                      (fee.getDescription().toLowerCase().contains("evento") || 
+                       fee.getDescription().toLowerCase().contains("event")));
+        
+        if (hasMonthlyFees && hasEventFees) {
+            description.append(" - Cuotas mensuales y eventos");
+        } else if (hasMonthlyFees) {
+            description.append(" - Cuotas mensuales");
+        } else if (hasEventFees) {
+            description.append(" - Eventos");
+        }
+        
+        return description.toString();
+    }
+    
+    /**
+     * Get current date in Argentina timezone to avoid timezone issues
+     */
+    private String getCurrentDateInArgentina() {
+        ZoneId argentinaZone = ZoneId.of("America/Argentina/Buenos_Aires");
+        LocalDate currentDate = LocalDate.now(argentinaZone);
+        return currentDate.toString();
     }
 }
