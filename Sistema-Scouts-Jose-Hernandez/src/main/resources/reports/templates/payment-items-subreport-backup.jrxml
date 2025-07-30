@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" 
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" 
+              name="payment-items-subreport" 
+              pageWidth="555" 
+              pageHeight="842" 
+              columnWidth="555" 
+              leftMargin="0" 
+              rightMargin="0" 
+              topMargin="0" 
+              bottomMargin="0" 
+              uuid="payment-items-uuid">
+    
+    <field name="description" class="java.lang.String"/>
+    <field name="amount" class="java.math.BigDecimal"/>
+    <field name="feeType" class="java.lang.String"/>
+    
+    <columnHeader>
+        <band height="25" splitType="Stretch">
+            <rectangle>
+                <reportElement x="0" y="0" width="555" height="25" uuid="header-bg"/>
+                <graphicElement>
+                    <pen lineWidth="1.0" lineColor="#E0E0E0"/>
+                </graphicElement>
+            </rectangle>
+            
+            <staticText>
+                <reportElement x="10" y="5" width="300" height="15" uuid="desc-header"/>
+                <textElement>
+                    <font fontName="Arial" size="10" isBold="true" />
+                </textElement>
+                <text><![CDATA[Concepto]]></text>
+            </staticText>
+            
+            <staticText>
+                <reportElement x="320" y="5" width="120" height="15" uuid="type-header"/>
+                <textElement textAlignment="Center">
+                    <font fontName="Arial" size="10" isBold="true" />
+                </textElement>
+                <text><![CDATA[Tipo]]></text>
+            </staticText>
+            
+            <staticText>
+                <reportElement x="450" y="5" width="95" height="15" uuid="amount-header"/>
+                <textElement textAlignment="Right">
+                    <font fontName="Arial" size="10" isBold="true" />
+                </textElement>
+                <text><![CDATA[Importe]]></text>
+            </staticText>
+        </band>
+    </columnHeader>
+    
+    <detail>
+        <band height="20" splitType="Stretch">
+            <textField>
+                <reportElement x="10" y="2" width="300" height="15" uuid="desc-value"/>
+                <textElement>
+                    <font fontName="Arial" size="9" />
+                </textElement>
+                <textFieldExpression><![CDATA[$F{description}]]></textFieldExpression>
+            </textField>
+            
+            <textField>
+                <reportElement x="320" y="2" width="120" height="15" uuid="type-value"/>
+                <textElement textAlignment="Center">
+                    <font fontName="Arial" size="9" />
+                </textElement>
+                <textFieldExpression><![CDATA[$F{feeType}]]></textFieldExpression>
+            </textField>
+            
+            <textField pattern="$ #,##0.00">
+                <reportElement x="450" y="2" width="95" height="15" uuid="amount-value"/>
+                <textElement textAlignment="Right">
+                    <font fontName="Arial" size="9" />
+                </textElement>
+                <textFieldExpression><![CDATA[$F{amount}]]></textFieldExpression>
+            </textField>
+            
+            <line>
+                <reportElement x="0" y="18" width="555" height="1" uuid="item-separator"/>
+                <graphicElement>
+                    <pen lineWidth="0.5" lineColor="#E0E0E0"/>
+                </graphicElement>
+            </line>
+        </band>
+    </detail>
+</jasperReport>

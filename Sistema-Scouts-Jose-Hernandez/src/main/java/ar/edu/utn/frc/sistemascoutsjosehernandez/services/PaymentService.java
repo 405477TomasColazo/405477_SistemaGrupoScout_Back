@@ -12,6 +12,7 @@ import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.PaymentRepository;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.UserRepository;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.MemberRepository;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.FamilyGroupRepository;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.reports.service.PaymentReceiptService;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.services.accounting.AccountingService;
 
 import com.mercadopago.MercadoPagoConfig;
@@ -76,6 +77,7 @@ public class PaymentService {
     private final EventRegistrationRepository eventRegistrationRepository;
     private final MemberRepository memberRepository;
     private final FamilyGroupRepository familyGroupRepository;
+    private final PaymentReceiptService paymentReceiptService;
     private final NotificationService notificationService;
     private final AccountingService accountingService;
 
@@ -346,9 +348,21 @@ public class PaymentService {
     }
 
     public byte[] generatePaymentReceipt(Integer paymentId) {
+        try {
+            // Try using JasperReports first (new professional templates)
+            if (paymentReceiptService.canGenerateReceipt(paymentId)) {
+                log.info("Generating payment receipt using JasperReports for payment ID: {}", paymentId);
+                return paymentReceiptService.generatePaymentReceipt(paymentId);
+            }
+        } catch (Exception e) {
+            log.warn("JasperReports generation failed for payment ID: {}, falling back to iText", paymentId, e);
+        }
+        
+        // Fallback to old iText method
+        log.info("Generating payment receipt using iText (fallback) for payment ID: {}", paymentId);
         Payment payment = paymentRepository.findByIdWithItems(paymentId)
                 .orElseThrow(() -> new RuntimeException("Pago no encontrado"));
-
+        
         return generatePDFReceipt(payment);
     }
 

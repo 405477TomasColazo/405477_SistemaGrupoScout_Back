@@ -1,0 +1,281 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<jasperReport xmlns="http://jasperreports.sourceforge.net/jasperreports" 
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" 
+              xsi:schemaLocation="http://jasperreports.sourceforge.net/jasperreports http://jasperreports.sourceforge.net/xsd/jasperreport.xsd" 
+              name="payment-receipt" 
+              pageWidth="595" 
+              pageHeight="842" 
+              columnWidth="555" 
+              leftMargin="20" 
+              rightMargin="20" 
+              topMargin="20" 
+              bottomMargin="20" 
+              uuid="8f6a1a5b-2c8b-4b9a-8d3e-4f7a1b9c2d5e">
+    
+    <parameter name="paymentId" class="java.lang.Integer"/>
+    <parameter name="amount" class="java.math.BigDecimal"/>
+    <parameter name="paymentDate" class="java.lang.String"/>
+    <parameter name="paymentMethod" class="java.lang.String"/>
+    <parameter name="referenceId" class="java.lang.String"/>
+    <parameter name="memberName" class="java.lang.String"/>
+    <parameter name="familyName" class="java.lang.String"/>
+    <parameter name="sectionName" class="java.lang.String"/>
+    <parameter name="memberDni" class="java.lang.String"/>
+    <parameter name="paymentItems" class="net.sf.jasperreports.engine.data.JRBeanCollectionDataSource"/>
+    
+    <title>
+        <band height="120" splitType="Stretch">
+            <!-- Organization Header -->
+            <rectangle>
+                <reportElement x="0" y="0" width="555" height="80" uuid="a1b2c3d4-e5f6-7890-abcd-ef1234567890"/>
+                <graphicElement>
+                    <pen lineWidth="1.0" lineColor="#2E8B57"/>
+                </graphicElement>
+            </rectangle>
+            
+            <staticText>
+                <reportElement x="20" y="10" width="400" height="25" uuid="b2c3d4e5-f6g7-8901-bcde-f23456789012"/>
+                <textElement>
+                    <font fontName="Arial" size="18" isBold="true" />
+                </textElement>
+                <text><![CDATA[Grupo Scout José Hernández]]></text>
+            </staticText>
+            
+            <staticText>
+                <reportElement x="20" y="35" width="400" height="20" uuid="c3d4e5f6-g7h8-9012-cdef-345678901234"/>
+                <textElement>
+                    <font fontName="Arial" size="12" />
+                </textElement>
+                <text><![CDATA[Sistema de Gestión - Comprobante de Pago]]></text>
+            </staticText>
+            
+            <staticText>
+                <reportElement x="20" y="55" width="400" height="15" uuid="d4e5f6g7-h8i9-0123-defa-456789012345"/>
+                <textElement>
+                    <font fontName="Arial" size="10" />
+                </textElement>
+                <text><![CDATA[Córdoba, Argentina]]></text>
+            </staticText>
+            
+            <!-- Receipt Number and Date -->
+            <staticText>
+                <reportElement x="420" y="10" width="120" height="20" uuid="e5f6g7h8-i9j0-1234-efab-567890123456"/>
+                <textElement textAlignment="Right">
+                    <font fontName="Arial" size="12" isBold="true" />
+                </textElement>
+                <text><![CDATA[Comprobante N°:]]></text>
+            </staticText>
+            
+            <textField>
+                <reportElement x="420" y="30" width="120" height="20" uuid="f6g7h8i9-j0k1-2345-fabc-678901234567"/>
+                <textElement textAlignment="Right">
+                    <font fontName="Arial" size="12" />
+                </textElement>
+                <textFieldExpression><![CDATA[$P{paymentId}]]></textFieldExpression>
+            </textField>
+            
+            <textField>
+                <reportElement x="420" y="50" width="120" height="20" uuid="g7h8i9j0-k1l2-3456-abcd-789012345678"/>
+                <textElement textAlignment="Right">
+                    <font fontName="Arial" size="10" />
+                </textElement>
+                <textFieldExpression><![CDATA[$P{paymentDate}]]></textFieldExpression>
+            </textField>
+        </band>
+    </title>
+    
+    <pageHeader>
+        <band height="100" splitType="Stretch">
+            <!-- Member Information Section -->
+            <staticText>
+                <reportElement x="0" y="10" width="555" height="20" uuid="member-info-title"/>
+                <textElement>
+                    <font fontName="Arial" size="14" isBold="true" />
+                </textElement>
+                <text><![CDATA[Información del Scout]]></text>
+            </staticText>
+            
+            <line>
+                <reportElement x="0" y="30" width="555" height="1" uuid="line1"/>
+                <graphicElement>
+                    <pen lineWidth="1.0" lineColor="#2E8B57"/>
+                </graphicElement>
+            </line>
+            
+            <staticText>
+                <reportElement x="20" y="40" width="100" height="15" uuid="member-name-label"/>
+                <textElement>
+                    <font fontName="Arial" size="10" isBold="true" />
+                </textElement>
+                <text><![CDATA[Nombre Scout:]]></text>
+            </staticText>
+            
+            <textField>
+                <reportElement x="120" y="40" width="200" height="15" uuid="member-name-value"/>
+                <textElement>
+                    <font fontName="Arial" size="10" />
+                </textElement>
+                <textFieldExpression><![CDATA[$P{memberName}]]></textFieldExpression>
+            </textField>
+            
+            <staticText>
+                <reportElement x="340" y="40" width="80" height="15" uuid="member-dni-label"/>
+                <textElement>
+                    <font fontName="Arial" size="10" isBold="true" />
+                </textElement>
+                <text><![CDATA[DNI:]]></text>
+            </staticText>
+            
+            <textField>
+                <reportElement x="420" y="40" width="120" height="15" uuid="member-dni-value"/>
+                <textElement>
+                    <font fontName="Arial" size="10" />
+                </textElement>
+                <textFieldExpression><![CDATA[$P{memberDni}]]></textFieldExpression>
+            </textField>
+            
+            <staticText>
+                <reportElement x="20" y="60" width="100" height="15" uuid="family-name-label"/>
+                <textElement>
+                    <font fontName="Arial" size="10" isBold="true" />
+                </textElement>
+                <text><![CDATA[Familia:]]></text>
+            </staticText>
+            
+            <textField>
+                <reportElement x="120" y="60" width="200" height="15" uuid="family-name-value"/>
+                <textElement>
+                    <font fontName="Arial" size="10" />
+                </textElement>
+                <textFieldExpression><![CDATA[$P{familyName}]]></textFieldExpression>
+            </textField>
+            
+            <staticText>
+                <reportElement x="340" y="60" width="80" height="15" uuid="section-label"/>
+                <textElement>
+                    <font fontName="Arial" size="10" isBold="true" />
+                </textElement>
+                <text><![CDATA[Sección:]]></text>
+            </staticText>
+            
+            <textField>
+                <reportElement x="420" y="60" width="120" height="15" uuid="section-value"/>
+                <textElement>
+                    <font fontName="Arial" size="10" />
+                </textElement>
+                <textFieldExpression><![CDATA[$P{sectionName}]]></textFieldExpression>
+            </textField>
+        </band>
+    </pageHeader>
+    
+    <detail>
+        <band height="200" splitType="Stretch">
+            <!-- Payment Details Section -->
+            <staticText>
+                <reportElement x="0" y="10" width="555" height="20" uuid="payment-details-title"/>
+                <textElement>
+                    <font fontName="Arial" size="14" isBold="true" />
+                </textElement>
+                <text><![CDATA[Detalles del Pago]]></text>
+            </staticText>
+            
+            <line>
+                <reportElement x="0" y="30" width="555" height="1" uuid="line2"/>
+                <graphicElement>
+                    <pen lineWidth="1.0" lineColor="#2E8B57"/>
+                </graphicElement>
+            </line>
+            
+            <!-- Payment Items Subreport -->
+            <subreport>
+                <reportElement x="0" y="40" width="555" height="100" uuid="payment-items-subreport"/>
+                <dataSourceExpression><![CDATA[$P{paymentItems}]]></dataSourceExpression>
+                <subreportExpression><![CDATA["reports/templates/payment-items-subreport.jasper"]]></subreportExpression>
+            </subreport>
+            
+            <!-- Payment Summary -->
+            <rectangle>
+                <reportElement x="350" y="150" width="205" height="40" uuid="summary-bg"/>
+                <graphicElement>
+                    <pen lineWidth="1.0" lineColor="#2E8B57"/>
+                </graphicElement>
+            </rectangle>
+            
+            <staticText>
+                <reportElement x="360" y="155" width="100" height="15" uuid="total-label"/>
+                <textElement>
+                    <font fontName="Arial" size="12" isBold="true" />
+                </textElement>
+                <text><![CDATA[TOTAL PAGADO:]]></text>
+            </staticText>
+            
+            <textField pattern="$ #,##0.00">
+                <reportElement x="460" y="155" width="85" height="15" uuid="total-amount"/>
+                <textElement textAlignment="Right">
+                    <font fontName="Arial" size="12" isBold="true" />
+                </textElement>
+                <textFieldExpression><![CDATA[$P{amount}]]></textFieldExpression>
+            </textField>
+            
+            <staticText>
+                <reportElement x="360" y="170" width="100" height="15" uuid="method-label"/>
+                <textElement>
+                    <font fontName="Arial" size="10" />
+                </textElement>
+                <text><![CDATA[Método de pago:]]></text>
+            </staticText>
+            
+            <textField>
+                <reportElement x="460" y="170" width="85" height="15" uuid="method-value"/>
+                <textElement textAlignment="Right">
+                    <font fontName="Arial" size="10" />
+                </textElement>
+                <textFieldExpression><![CDATA[$P{paymentMethod}]]></textFieldExpression>
+            </textField>
+        </band>
+    </detail>
+    
+    <pageFooter>
+        <band height="80" splitType="Stretch">
+            <!-- Footer Information -->
+            <line>
+                <reportElement x="0" y="10" width="555" height="1" uuid="footer-line"/>
+                <graphicElement>
+                    <pen lineWidth="1.0" lineColor="#2E8B57"/>
+                </graphicElement>
+            </line>
+            
+            <staticText>
+                <reportElement x="0" y="20" width="555" height="15" uuid="footer-text1"/>
+                <textElement textAlignment="Center">
+                    <font fontName="Arial" size="10" />
+                </textElement>
+                <text><![CDATA[Este comprobante es válido como constancia de pago para el Grupo Scout José Hernández]]></text>
+            </staticText>
+            
+            <textField>
+                <reportElement x="0" y="35" width="250" height="15" uuid="reference-id"/>
+                <textElement>
+                    <font fontName="Arial" size="8" />
+                </textElement>
+                <textFieldExpression><![CDATA["Referencia: " + $P{referenceId}]]></textFieldExpression>
+            </textField>
+            
+            <textField>
+                <reportElement x="350" y="35" width="205" height="15" uuid="generated-date"/>
+                <textElement textAlignment="Right">
+                    <font fontName="Arial" size="8" />
+                </textElement>
+                <textFieldExpression><![CDATA["Generado el: " + new java.text.SimpleDateFormat("dd/MM/yyyy HH:mm").format(new java.util.Date())]]></textFieldExpression>
+            </textField>
+            
+            <staticText>
+                <reportElement x="0" y="55" width="555" height="15" uuid="footer-contact"/>
+                <textElement textAlignment="Center">
+                    <font fontName="Arial" size="8" />
+                </textElement>
+                <text><![CDATA[Para consultas: contacto@gruposcoutjh.org.ar - www.gruposcoutjh.org.ar]]></text>
+            </staticText>
+        </band>
+    </pageFooter>
+</jasperReport>
