@@ -73,4 +73,8 @@ public interface FeeRepository extends JpaRepository<Fee, Integer> {
             @Param("maxAmount") BigDecimal maxAmount,
             @Param("period") String period,
             Pageable pageable);
+
+    // Notification-related queries
+    @Query("SELECT f FROM Fee f WHERE f.status = 'PENDING' AND f.period < :currentMonth")
+    List<Fee> findOverdueFees(@Param("currentMonth") String currentMonth);
 }

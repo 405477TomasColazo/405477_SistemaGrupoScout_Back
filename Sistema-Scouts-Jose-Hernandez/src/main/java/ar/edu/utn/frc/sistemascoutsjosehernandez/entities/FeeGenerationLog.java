@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.sistemascoutsjosehernandez.entities;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
@@ -50,6 +51,7 @@ public class FeeGenerationLog {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "executed_by_user_id")
+    @JsonIgnoreProperties({"rolesXUser", "passwordHash", "passwordResetToken", "passwordResetTokenExpiry"})
     private User executedByUser;
 
     @Lob

@@ -1,7 +1,17 @@
 package ar.edu.utn.frc.sistemascoutsjosehernandez.controllers;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.dtos.payments.*;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.FamilyGroup;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.Payment;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.User;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.FamilyGroupRepository;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.PaymentRepository;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.reports.service.PaymentReceiptService;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.services.PaymentService;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.util.SecurityUtils;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +26,10 @@ import java.util.Map;
 public class PaymentsController {
 
     private final PaymentService paymentService;
+    private final PaymentReceiptService paymentReceiptService;
+    private final PaymentRepository paymentRepository;
+    private final FamilyGroupRepository familyGroupRepository;
+    private final SecurityUtils securityUtils;
 
     @GetMapping("/fees/{memberId}")
     @PreAuthorize("hasAnyRole('FAMILY', 'EDUCATOR', 'ADMIN')")
@@ -113,6 +127,102 @@ public class PaymentsController {
             e.printStackTrace();
             // Always return OK to avoid webhook retries from MercadoPago
             return ResponseEntity.ok("OK");
+        }
+    }
+
+    @GetMapping("/{paymentId}/receipt")
+    @PreAuthorize("hasAnyRole('FAMILY', 'EDUCATOR', 'ADMIN')")
+    public ResponseEntity<byte[]> downloadPaymentReceipt(@PathVariable Integer paymentId) {
+        try {
+            // Validate access permissions
+            if (!canAccessPaymentReceipt(paymentId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+
+            // Check if receipt can be generated
+            if (!paymentReceiptService.canGenerateReceipt(paymentId)) {
+                return ResponseEntity.notFound().build();
+            }
+
+            // Generate receipt using JasperReports
+            byte[] receipt = paymentReceiptService.generatePaymentReceipt(paymentId);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", "comprobante-pago-" + paymentId + ".pdf");
+            
+            return new ResponseEntity<>(receipt, headers, HttpStatus.OK);
+            
+        } catch (Exception e) {
+            // Fallback to old method if JasperReports fails
+            byte[] receipt = paymentService.generatePaymentReceipt(paymentId);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", "comprobante-pago-" + paymentId + ".pdf");
+            
+            return new ResponseEntity<>(receipt, headers, HttpStatus.OK);
+        }
+    }
+
+    @GetMapping("/{paymentId}/receipt/preview")
+    @PreAuthorize("hasAnyRole('FAMILY', 'EDUCATOR', 'ADMIN')")
+    public ResponseEntity<byte[]> previewPaymentReceipt(@PathVariable Integer paymentId) {
+        try {
+            // Validate access permissions
+            if (!canAccessPaymentReceipt(paymentId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+
+            // Check if receipt can be generated
+            if (!paymentReceiptService.canGenerateReceipt(paymentId)) {
+                return ResponseEntity.notFound().build();
+            }
+
+            // Generate receipt using JasperReports
+            byte[] receipt = paymentReceiptService.generatePaymentReceipt(paymentId);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("inline", "comprobante-pago-" + paymentId + ".pdf");
+            
+            return new ResponseEntity<>(receipt, headers, HttpStatus.OK);
+            
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    private boolean canAccessPaymentReceipt(Integer paymentId) {
+        try {
+            User currentUser = securityUtils.getCurrentUser();
+            
+            // Admins and educators can access all receipts
+            if (securityUtils.hasRole("ADMIN") || securityUtils.hasRole("EDUCATOR")) {
+                return true;
+            }
+
+            // Families can only access receipts for their own family members
+            if (securityUtils.hasRole("FAMILY")) {
+                Payment payment = paymentRepository.findById(paymentId).orElse(null);
+                if (payment == null) {
+                    return false;
+                }
+
+                // Find the user's family group and check if the payment belongs to any member
+                FamilyGroup userFamilyGroup = familyGroupRepository.findFamilyGroupsByUser_Id(currentUser.getId());
+                if (userFamilyGroup == null) {
+                    return false;
+                }
+                
+                return userFamilyGroup.getMembers().stream()
+                       .anyMatch(member -> member.getId().equals(payment.getMemberId()));
+            }
+
+            return false;
+
+        } catch (Exception e) {
+            return false;
         }
     }
 

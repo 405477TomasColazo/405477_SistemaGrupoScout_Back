@@ -29,6 +29,7 @@ public class MonthlyFeeService {
     private final UserRepository userRepository;
     private final MemberTypeRepository memberTypeRepository;
     private final GlobalFeeConfigurationRepository globalFeeConfigurationRepository;
+    private final NotificationService notificationService;
 
     /**
      * Generates monthly fees for all active protagonists
@@ -71,7 +72,7 @@ public class MonthlyFeeService {
             List<Member> protagonists = memberRepository.findActiveProtagonistMembers();
             result.setMembersProcessed(protagonists.size());
             
-            executionDetails.append(String.format("Processing %d active protagonists for month %s\n", protagonists.size(), month));
+            executionDetails.append(String.format("Procesando %d protagonistas activos para el mes %s\n", protagonists.size(), month));
             
             for (Member member : protagonists) {
                 try {
@@ -80,28 +81,30 @@ public class MonthlyFeeService {
                         result.incrementFeesUpdated();
                     } else {
                         result.incrementFeesGenerated();
+                        // Create notification for new fee generated
+                        createMonthlyFeeNotification(member, month);
                     }
                 } catch (Exception e) {
                     log.error("Error processing member {}: {}", member.getId(), e.getMessage());
-                    errors.add(String.format("Member %s %s: %s", member.getName(), member.getLastname(), e.getMessage()));
+                    errors.add(String.format("Miembro %s %s: %s", member.getName(), member.getLastname(), e.getMessage()));
                 }
             }
             
             // Add summary instead of individual lines
-            executionDetails.append(String.format("Generated: %d new fees, Updated: %d existing fees\n", 
+            executionDetails.append(String.format("Generadas: %d cuotas nuevas, Actualizadas: %d cuotas existentes\n", 
                 result.getFeesGenerated(), result.getFeesUpdated()));
             
             if (errors.isEmpty()) {
-                executionDetails.append("Completed successfully with 0 errors");
+                executionDetails.append("Completado exitosamente sin errores");
             } else {
-                executionDetails.append(String.format("Completed with %d errors:\n", errors.size()));
+                executionDetails.append(String.format("Completado con %d errores:\n", errors.size()));
                 // Only add first few errors to avoid field length issues
                 int maxErrors = Math.min(errors.size(), 5);
                 for (int i = 0; i < maxErrors; i++) {
                     executionDetails.append("- ").append(errors.get(i)).append("\n");
                 }
                 if (errors.size() > 5) {
-                    executionDetails.append(String.format("... and %d more errors", errors.size() - 5));
+                    executionDetails.append(String.format("... y %d errores más", errors.size() - 5));
                 }
             }
             
@@ -125,7 +128,7 @@ public class MonthlyFeeService {
             result.setError(e.getMessage());
             
             // Save error log with concise details
-            String errorDetails = String.format("Processing %d protagonists for month %s\nFATAL ERROR: %s", 
+            String errorDetails = String.format("Procesando %d protagonistas para el mes %s\nERROR FATAL: %s", 
                 result.getMembersProcessed(), month, e.getMessage());
             
             FeeGenerationLog errorLog = FeeGenerationLog.builder()
@@ -231,12 +234,12 @@ public class MonthlyFeeService {
                 .totalFeesUpdated(updatedFees)
                 .executedByUser(updatedByUser)
                 .status(FeeGenerationLog.FeeGenerationStatus.SUCCESS)
-                .executionDetails(String.format("Global price updated to $%s, %d pending fees adjusted", newAmount, updatedFees))
+                .executionDetails(String.format("Precio global actualizado a $%s, %d cuotas pendientes ajustadas", newAmount, updatedFees))
                 .build();
         
         feeGenerationLogRepository.save(logEntry);
         
-        return new GlobalPriceUpdateResult(newAmount, updatedFees, "Global price updated successfully");
+        return new GlobalPriceUpdateResult(newAmount, updatedFees, "Precio global actualizado exitosamente");
     }
 
     /**
@@ -350,5 +353,30 @@ public class MonthlyFeeService {
 
         public String getMessage() { return message; }
         public void setMessage(String message) { this.message = message; }
+    }
+
+    /**
+     * Creates a notification when a new monthly fee is generated for a member
+     */
+    private void createMonthlyFeeNotification(Member member, String month) {
+        try {
+            if (member.getUser() != null) {
+                // This method is called when a new fee is created, so count is 1
+                int feeCount = 1;
+                
+                notificationService.createMonthlyFeeGeneratedNotification(
+                    member.getUser(), 
+                    month, 
+                    feeCount
+                );
+                
+                log.debug("Created fee generation notification for member {} ({}) for month {}", 
+                    member.getId(), member.getUser().getEmail(), month);
+            }
+        } catch (Exception e) {
+            // Log error but don't fail the fee generation process
+            log.error("Error creating fee generation notification for member {}: {}", 
+                member.getId(), e.getMessage());
+        }
     }
 }

@@ -84,4 +84,11 @@ public class FamilyGroupController {
         familyGroupService.deleteRelationship(id);
         return ResponseEntity.noContent().build();
     }
+
+    @GetMapping("/member/dni-exists/{dni}")
+    @PreAuthorize("hasRole('FAMILY') or hasRole('ADMIN')")
+    public ResponseEntity<Boolean> checkDniExists(@PathVariable String dni) {
+        boolean exists = familyGroupService.checkDniExists(dni);
+        return ResponseEntity.ok(exists);
+    }
 }

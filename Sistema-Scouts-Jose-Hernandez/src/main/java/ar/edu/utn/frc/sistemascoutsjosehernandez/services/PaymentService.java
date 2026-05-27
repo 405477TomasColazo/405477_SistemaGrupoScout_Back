@@ -12,6 +12,8 @@ import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.PaymentRepository;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.UserRepository;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.MemberRepository;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.FamilyGroupRepository;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.reports.service.PaymentReceiptService;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.services.accounting.AccountingService;
 
 import com.mercadopago.MercadoPagoConfig;
 import com.mercadopago.client.payment.PaymentClient;
@@ -26,6 +28,7 @@ import com.mercadopago.exceptions.MPException;
 import com.mercadopago.resources.preference.Preference;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -37,6 +40,7 @@ import javax.annotation.PostConstruct;
 import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -54,9 +58,11 @@ import com.itextpdf.kernel.font.PdfFontFactory;
 import com.itextpdf.kernel.font.PdfFont;
 import com.itextpdf.io.font.constants.StandardFonts;
 
+import java.time.Instant;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class PaymentService {
 
     @Value("${token.mp}")
@@ -71,6 +77,9 @@ public class PaymentService {
     private final EventRegistrationRepository eventRegistrationRepository;
     private final MemberRepository memberRepository;
     private final FamilyGroupRepository familyGroupRepository;
+    private final PaymentReceiptService paymentReceiptService;
+    private final NotificationService notificationService;
+    private final AccountingService accountingService;
 
     @PostConstruct
     public void init() {
@@ -164,10 +173,10 @@ public class PaymentService {
             Payment payment = Payment.builder()
                     .memberId(getMemberIdFromFees(request.getFeeIds()))
                     .amount(mpPayment.getTransactionAmount())
-                    .paymentDate(LocalDate.now().toString())
+                    .paymentDate(getCurrentDateInArgentina())
                     .status(mapMercadoPagoStatus(mpPayment.getStatus()))
                     .referenceId(mpPayment.getId().toString())
-                    .paymentMethod(mpPayment.getPaymentMethodId())
+                    .paymentMethod(paymentMethodType) // Usar el tipo detectado en lugar del ID de MercadoPago
                     .build();
 
             List<PaymentItem> items = createPaymentItemsFromFees(request.getFeeIds());
@@ -188,6 +197,24 @@ public class PaymentService {
                     }
 
                 }
+
+            // Create accounting entry for completed payments
+            if (mpPayment.getStatus().equalsIgnoreCase("approved")) {
+                try {
+                    String description = buildPaymentDescription(savedPayment);
+                    accountingService.createAutomaticPaymentEntry(
+                        savedPayment.getId().toString(),
+                        savedPayment.getAmount(),
+                        description,
+                        paymentMethodType
+                    );
+                    log.info("Created accounting entry for payment: {}", savedPayment.getId());
+                } catch (Exception e) {
+                    log.error("Failed to create accounting entry for payment {}: {}", 
+                             savedPayment.getId(), e.getMessage());
+                    // Don't fail the payment if accounting fails
+                }
+            }
 
             ProcessPaymentResponse response = new ProcessPaymentResponse();
             if (mpPayment.getStatus().equalsIgnoreCase("approved")) {
@@ -214,66 +241,42 @@ public class PaymentService {
     public PaymentsHistoryResponse getPaymentsHistory(PaymentFilters filters, int page, int limit) {
         PageRequest pageRequest = PageRequest.of(page, limit);
         
-        // Get current user and check if they are admin
+        // Get current user 
         String currentUserEmail = getCurrentUserEmail();
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         
-        boolean isAdmin = currentUser.getRolesXUser().stream()
-                .anyMatch(roleXUser -> roleXUser.getRole().getDescription().equals("ROLE_ADMIN"));
-        
-        Page<Payment> paymentsPage;
-        
-        if (isAdmin) {
-            // Admin can see all payments
-            paymentsPage = paymentRepository.findByFilters(
-                    filters.getMemberId(),
-                    filters.getDateFrom(),
-                    filters.getDateTo(),
-                    filters.getMinAmount(),
-                    pageRequest
-            );
-        } else {
-            // Non-admin users can only see payments from their family
-            FamilyGroup familyGroup = familyGroupRepository.findFamilyGroupsByUser_Id(currentUser.getId());
-            if (familyGroup == null) {
-                throw new RuntimeException("Family group not found");
-            }
-            
-            List<Integer> familyMemberIds = memberRepository.findAllByFamilyGroup_Id(familyGroup.getId())
-                    .stream()
-                    .map(Member::getId)
-                    .collect(Collectors.toList());
-            
-            // Filter payments to only include family members
-            paymentsPage = paymentRepository.findByFilters(
-                    filters.getMemberId(),
-                    filters.getDateFrom(),
-                    filters.getDateTo(),
-                    filters.getMinAmount(),
-                    pageRequest
-            );
-            
-            // Additional filtering by family members
-            paymentsPage = paymentsPage.map(payment -> {
-                if (familyMemberIds.contains(payment.getMemberId())) {
-                    return payment;
-                }
-                return null;
-            });
-            
-            // Remove null entries
-            List<Payment> filteredPayments = paymentsPage.getContent().stream()
-                    .filter(payment -> payment != null && familyMemberIds.contains(payment.getMemberId()))
-                    .collect(Collectors.toList());
-            
-            // Create new page with filtered results
-            paymentsPage = new org.springframework.data.domain.PageImpl<>(
-                    filteredPayments,
-                    pageRequest,
-                    filteredPayments.size()
-            );
+        // All users (including admins) can only see payments from their family
+        FamilyGroup familyGroup = familyGroupRepository.findFamilyGroupsByUser_Id(currentUser.getId());
+        if (familyGroup == null) {
+            throw new RuntimeException("Family group not found");
         }
+        
+        List<Integer> familyMemberIds = memberRepository.findAllByFamilyGroup_Id(familyGroup.getId())
+                .stream()
+                .map(Member::getId)
+                .collect(Collectors.toList());
+        
+        // Filter payments to only include family members
+        Page<Payment> paymentsPage = paymentRepository.findByFilters(
+                filters.getMemberId(),
+                filters.getDateFrom(),
+                filters.getDateTo(),
+                filters.getMinAmount(),
+                pageRequest
+        );
+        
+        // Additional filtering by family members
+        List<Payment> filteredPayments = paymentsPage.getContent().stream()
+                .filter(payment -> payment != null && familyMemberIds.contains(payment.getMemberId()))
+                .collect(Collectors.toList());
+        
+        // Create new page with filtered results
+        paymentsPage = new org.springframework.data.domain.PageImpl<>(
+                filteredPayments,
+                pageRequest,
+                filteredPayments.size()
+        );
 
         List<PaymentDto> paymentDTOs = paymentsPage.getContent().stream()
                 .map(this::mapToPaymentDTO)
@@ -334,13 +337,32 @@ public class PaymentService {
             }
         }
 
+        // Create notifications for payment status changes
+        if (newStatus == PaymentStatus.COMPLETED && oldStatus != PaymentStatus.COMPLETED) {
+            createPaymentConfirmationNotification(payment);
+        } else if (newStatus == PaymentStatus.FAILED && oldStatus != PaymentStatus.FAILED) {
+            createPaymentFailedNotification(payment, reason != null ? reason : "Error en el procesamiento");
+        }
+
         return mapToPaymentDTO(savedPayment);
     }
 
     public byte[] generatePaymentReceipt(Integer paymentId) {
+        try {
+            // Try using JasperReports first (new professional templates)
+            if (paymentReceiptService.canGenerateReceipt(paymentId)) {
+                log.info("Generating payment receipt using JasperReports for payment ID: {}", paymentId);
+                return paymentReceiptService.generatePaymentReceipt(paymentId);
+            }
+        } catch (Exception e) {
+            log.warn("JasperReports generation failed for payment ID: {}, falling back to iText", paymentId, e);
+        }
+        
+        // Fallback to old iText method
+        log.info("Generating payment receipt using iText (fallback) for payment ID: {}", paymentId);
         Payment payment = paymentRepository.findByIdWithItems(paymentId)
                 .orElseThrow(() -> new RuntimeException("Pago no encontrado"));
-
+        
         return generatePDFReceipt(payment);
     }
 
@@ -384,8 +406,8 @@ public class PaymentService {
             addTableRow(paymentTable, "Fecha:", payment.getPaymentDate() != null ? payment.getPaymentDate().toString() : "N/A", boldFont, regularFont);
             addTableRow(paymentTable, "Protagonista:", memberName, boldFont, regularFont);
             addTableRow(paymentTable, "Monto Total:", "$" + payment.getAmount(), boldFont, regularFont);
-            addTableRow(paymentTable, "Estado:", payment.getStatus().toString(), boldFont, regularFont);
-            addTableRow(paymentTable, "Método:", payment.getPaymentMethod() != null ? payment.getPaymentMethod() : "N/A", boldFont, regularFont);
+            addTableRow(paymentTable, "Estado:", getPaymentStatusInSpanish(payment.getStatus()), boldFont, regularFont);
+            addTableRow(paymentTable, "Método:", getPaymentMethodInSpanish(payment.getPaymentMethod()), boldFont, regularFont);
             
             document.add(paymentTable);
             document.add(new Paragraph("\n"));
@@ -459,8 +481,8 @@ public class PaymentService {
         content.append("Fecha: ").append(payment.getPaymentDate() != null ? payment.getPaymentDate() : "N/A").append("\n");
         content.append("Beneficiario: ").append(memberName).append("\n");
         content.append("Monto Total: $").append(payment.getAmount()).append("\n");
-        content.append("Estado: ").append(payment.getStatus()).append("\n");
-        content.append("Método: ").append(payment.getPaymentMethod() != null ? payment.getPaymentMethod() : "N/A").append("\n\n");
+        content.append("Estado: ").append(getPaymentStatusInSpanish(payment.getStatus())).append("\n");
+        content.append("Método: ").append(getPaymentMethodInSpanish(payment.getPaymentMethod())).append("\n\n");
         
         content.append("==========================================\n");
         content.append("CONCEPTOS PAGADOS\n");
@@ -547,7 +569,7 @@ public class PaymentService {
         dto.setPaymentDate(savedPayment.getPaymentDate());
         dto.setStatus(savedPayment.getStatus().name().toLowerCase());
         dto.setReferenceId(savedPayment.getReferenceId());
-        dto.setPaymentMethod(savedPayment.getPaymentMethod());
+        dto.setPaymentMethod(getPaymentMethodInSpanish(savedPayment.getPaymentMethod()));
         dto.setItems(itemDTOS);
         return dto;
     }
@@ -597,6 +619,92 @@ public class PaymentService {
         }
         
         return "card"; // Default to card for backward compatibility
+    }
+    
+    private String getPaymentStatusInSpanish(PaymentStatus status) {
+        if (status == null) return "N/A";
+        
+        switch (status) {
+            case COMPLETED:
+                return "Completado";
+            case PENDING:
+                return "Pendiente";
+            case FAILED:
+                return "Fallido";
+            case REFUNDED:
+                return "Reembolsado";
+            case PROCESSING:
+                return "Procesando";
+            case UNKNOWN:
+                return "Desconocido";
+            default:
+                return status.toString();
+        }
+    }
+    
+    private String getPaymentMethodInSpanish(String paymentMethod) {
+        if (paymentMethod == null) return "N/A";
+        
+        String method = paymentMethod.toLowerCase();
+        
+        // Tipos de pago detectados
+        switch (method) {
+            case "card":
+                return "Tarjeta de crédito/débito";
+            case "ticket":
+                return "Efectivo";
+            case "bank_transfer":
+                return "Transferencia bancaria";
+            case "digital_wallet":
+                return "Billetera digital";
+            case "account_money":
+                return "Dinero en cuenta";
+            case "account_balance":
+                return "Balance de cuenta";
+            case "atm":
+                return "Cajero automático";
+            
+            // IDs específicos de MercadoPago (para pagos ya existentes)
+            case "visa":
+                return "Tarjeta Visa";
+            case "mastercard":
+            case "master":
+                return "Tarjeta Mastercard";
+            case "american_express":
+            case "amex":
+                return "Tarjeta American Express";
+            case "credit_card":
+                return "Tarjeta de crédito";
+            case "debit_card":
+                return "Tarjeta de débito";
+            case "pix":
+                return "PIX";
+            case "rapipago":
+                return "RapiPago";
+            case "pagofacil":
+                return "PagoFácil";
+            case "bacs":
+                return "Transferencia bancaria";
+            case "wire_transfer":
+                return "Transferencia bancaria";
+            
+            // Para casos no reconocidos, intentar identificar el tipo
+            default:
+                // Si contiene ciertos términos, intentar clasificar
+                if (method.contains("card") || method.contains("visa") || method.contains("master") || 
+                    method.contains("amex") || method.contains("credit") || method.contains("debit")) {
+                    return "Tarjeta de crédito/débito";
+                }
+                if (method.contains("bank") || method.contains("transfer") || method.contains("wire")) {
+                    return "Transferencia bancaria";
+                }
+                if (method.contains("cash") || method.contains("efectivo") || method.contains("ticket")) {
+                    return "Efectivo";
+                }
+                
+                // Si no podemos identificar, retornar el valor original formateado
+                return paymentMethod.substring(0, 1).toUpperCase() + paymentMethod.substring(1).toLowerCase();
+        }
     }
     
     private PaymentCreateRequest buildPaymentRequest(ProcessPaymentRequest request, String paymentMethodType) {
@@ -738,6 +846,7 @@ public class PaymentService {
                 
                 // Only update if status actually changed
                 if (payment.getStatus() != newStatus) {
+                    PaymentStatus oldStatus = payment.getStatus();
                     payment.setStatus(newStatus);
                     // Note: PaymentMethod is an entity, not enum. We'd need to find or create the method
                     // For now, we'll skip updating payment method to avoid complexity
@@ -760,6 +869,31 @@ public class PaymentService {
                         if (item.getFee() != null) {
                             updateEventRegistrationPaymentStatus(item.getFee(), newStatus, payment.getId());
                         }
+                    }
+                    
+                    // Create notifications for payment status changes via webhook
+                    if (newStatus == PaymentStatus.COMPLETED && oldStatus != PaymentStatus.COMPLETED) {
+                        createPaymentConfirmationNotification(payment);
+                        
+                        // Create accounting entry for newly completed payments
+                        try {
+                            String description = buildPaymentDescription(payment);
+                            accountingService.createAutomaticPaymentEntry(
+                                payment.getId().toString(),
+                                payment.getAmount(),
+                                description,
+                                payment.getPaymentMethod()
+                            );
+                            log.info("Created accounting entry for webhook payment: {}", payment.getId());
+                        } catch (Exception e) {
+                            log.error("Failed to create accounting entry for webhook payment {}: {}", 
+                                     payment.getId(), e.getMessage());
+                            // Don't fail the webhook if accounting fails
+                        }
+                    } else if (newStatus == PaymentStatus.FAILED && oldStatus != PaymentStatus.FAILED) {
+                        String failureReason = mpPayment.getStatusDetail() != null ? 
+                            mpPayment.getStatusDetail() : "Error en el procesamiento del pago";
+                        createPaymentFailedNotification(payment, failureReason);
                     }
                     
                     System.out.println("Payment " + payment.getId() + " status updated to " + newStatus + " via webhook");
@@ -1033,9 +1167,20 @@ public class PaymentService {
             BigDecimal balanceToUse = currentBalance.min(totalFeesAmount);
             BigDecimal remainingAmount = totalFeesAmount.subtract(balanceToUse);
             
-            // Apply balance proportionally to each fee
+            // Create Payment record for the balance transaction
+            Payment payment = Payment.builder()
+                    .memberId(member.getId())
+                    .amount(balanceToUse)
+                    .paymentDate(getCurrentDateInArgentina())
+                    .status(PaymentStatus.COMPLETED)
+                    .referenceId("BALANCE_" + System.currentTimeMillis())
+                    .paymentMethod("ACCOUNT_BALANCE")
+                    .build();
+            
+            // Apply balance proportionally to each fee and create payment items
             BigDecimal remainingBalance = balanceToUse;
             List<FeeDto> updatedFees = new ArrayList<>();
+            List<PaymentItem> paymentItems = new ArrayList<>();
             int feesPaidCompletely = 0;
 
             for (Fee fee : fees) {
@@ -1047,6 +1192,18 @@ public class PaymentService {
                 BigDecimal discountForThisFee = remainingBalance.min(originalAmount);
                 BigDecimal newAmount = originalAmount.subtract(discountForThisFee);
                 
+                // Create PaymentItem for the portion paid with balance
+                if (discountForThisFee.compareTo(BigDecimal.ZERO) > 0) {
+                    PaymentItem paymentItem = PaymentItem.builder()
+                            .fee(fee)
+                            .description(fee.getDescription())
+                            .period(fee.getPeriod())
+                            .amount(discountForThisFee)
+                            .payment(payment)
+                            .build();
+                    paymentItems.add(paymentItem);
+                }
+                
                 // Update fee amount
                 fee.setAmount(newAmount);
                 
@@ -1054,6 +1211,9 @@ public class PaymentService {
                 if (newAmount.compareTo(BigDecimal.ZERO) == 0) {
                     fee.setStatus(PaymentStatus.COMPLETED);
                     feesPaidCompletely++;
+                    
+                    // Update EventRegistration payment status if this fee is for an event
+                    updateEventRegistrationPaymentStatus(fee, PaymentStatus.COMPLETED, null);
                 }
                 
                 feeRepository.save(fee);
@@ -1062,11 +1222,49 @@ public class PaymentService {
                 // Add to updated fees list
                 updatedFees.add(toFeeDto(fee));
             }
+            
+            // Set payment items and save payment
+            payment.setItems(paymentItems);
+            Payment savedPayment = paymentRepository.save(payment);
+            
+            // Update event registrations with the payment ID for completed fees
+            for (PaymentItem item : paymentItems) {
+                if (item.getFee().getStatus() == PaymentStatus.COMPLETED) {
+                    updateEventRegistrationPaymentStatus(item.getFee(), PaymentStatus.COMPLETED, savedPayment.getId().intValue());
+                }
+            }
 
             // Update member's balance
             BigDecimal newMemberBalance = currentBalance.subtract(balanceToUse);
             member.setAccountBalance(newMemberBalance);
             memberRepository.save(member);
+
+            // Create accounting entry for balance payment
+            if (balanceToUse.compareTo(BigDecimal.ZERO) > 0) {
+                try {
+                    String description = buildBalancePaymentDescription(member, updatedFees, feesPaidCompletely);
+                    accountingService.createAutomaticPaymentEntry(
+                        savedPayment.getId().toString(),
+                        balanceToUse,
+                        description,
+                        "ACCOUNT_BALANCE"
+                    );
+                    log.info("Created accounting entry for balance payment: {}", savedPayment.getId());
+                } catch (Exception e) {
+                    log.error("Failed to create accounting entry for balance payment {}: {}", 
+                             savedPayment.getId(), e.getMessage());
+                    // Don't fail the balance application if accounting fails
+                }
+            }
+
+            // Create notification for successful balance application
+            if (balanceToUse.compareTo(BigDecimal.ZERO) > 0 && member.getUser() != null) {
+                notificationService.createBalanceAppliedNotification(
+                    member.getUser(), 
+                    feesPaidCompletely, 
+                    balanceToUse
+                );
+            }
 
             return ApplyBalanceResponse.builder()
                     .status("success")
@@ -1087,5 +1285,140 @@ public class PaymentService {
                     .feesPaidCompletely(0)
                     .build();
         }
+    }
+
+    private void createPaymentConfirmationNotification(Payment payment) {
+        try {
+            if (payment.getMemberId() != null) {
+                Member member = memberRepository.findById(payment.getMemberId())
+                        .orElse(null);
+                if (member != null && member.getUser() != null) {
+                    NotificationType confirmationType = getOrCreateNotificationType("PAYMENT_CONFIRMATION");
+                    
+                    Notification notification = new Notification();
+                    notification.setUser(member.getUser());
+                    notification.setTitle("Pago confirmado");
+                    notification.setMessage(String.format("Tu pago por $%.2f ha sido confirmado exitosamente.", 
+                            payment.getAmount()));
+                    notification.setNotificationType(confirmationType);
+                    notification.setCreatedAt(Instant.now());
+                    notification.setRelatedEntity("PAYMENT");
+                    notification.setRelatedEntityId(payment.getId());
+                    
+                    notificationService.save(notification);
+                }
+            }
+        } catch (Exception e) {
+            // Log error but don't fail the payment process
+            System.err.println("Error creating payment confirmation notification: " + e.getMessage());
+        }
+    }
+
+    private void createPaymentFailedNotification(Payment payment, String reason) {
+        try {
+            if (payment.getMemberId() != null) {
+                Member member = memberRepository.findById(payment.getMemberId())
+                        .orElse(null);
+                if (member != null && member.getUser() != null) {
+                    notificationService.createPaymentFailedNotification(member.getUser(), payment, reason);
+                }
+            }
+        } catch (Exception e) {
+            // Log error but don't fail the payment process
+            System.err.println("Error creating payment failed notification: " + e.getMessage());
+        }
+    }
+    
+    private NotificationType getOrCreateNotificationType(String typeName) {
+        return notificationService.getOrCreateNotificationType(typeName);
+    }
+
+    private String buildPaymentDescription(Payment payment) {
+        if (payment.getItems() == null || payment.getItems().isEmpty()) {
+            return "Pago recibido";
+        }
+
+        // Build description based on payment items
+        StringBuilder description = new StringBuilder();
+        boolean hasMonthlyFees = false;
+        boolean hasEventFees = false;
+
+        for (PaymentItem item : payment.getItems()) {
+            if (item.getDescription() != null) {
+                if (item.getDescription().toLowerCase().contains("cuota") || 
+                    item.getDescription().toLowerCase().contains("monthly")) {
+                    hasMonthlyFees = true;
+                } else if (item.getDescription().toLowerCase().contains("evento") || 
+                          item.getDescription().toLowerCase().contains("event")) {
+                    hasEventFees = true;
+                }
+            }
+        }
+
+        if (hasMonthlyFees && hasEventFees) {
+            description.append("Cuotas mensuales y pagos de eventos");
+        } else if (hasMonthlyFees) {
+            description.append("Pago de cuota mensual");
+        } else if (hasEventFees) {
+            description.append("Pago de evento");
+        } else {
+            description.append("Pago recibido");
+        }
+
+        // Add member information if available
+        if (payment.getMemberId() != null) {
+            Member member = memberRepository.findById(payment.getMemberId()).orElse(null);
+            if (member != null) {
+                description.append(" - ").append(member.getName()).append(" ").append(member.getLastname());
+            }
+        }
+
+        return description.toString();
+    }
+
+    private String buildBalancePaymentDescription(Member member, List<FeeDto> updatedFees, int feesPaidCompletely) {
+        StringBuilder description = new StringBuilder();
+        description.append("Aplicación de saldo");
+        
+        if (member != null) {
+            description.append(" - ").append(member.getName()).append(" ").append(member.getLastname());
+        }
+        
+        if (feesPaidCompletely > 0) {
+            description.append(" (").append(feesPaidCompletely).append(" cuota");
+            if (feesPaidCompletely > 1) {
+                description.append("s");
+            }
+            description.append(" pagadas completamente)");
+        }
+        
+        // Add fee types for context
+        boolean hasMonthlyFees = updatedFees.stream()
+            .anyMatch(fee -> fee.getDescription() != null && 
+                      (fee.getDescription().toLowerCase().contains("cuota") || 
+                       fee.getDescription().toLowerCase().contains("monthly")));
+        boolean hasEventFees = updatedFees.stream()
+            .anyMatch(fee -> fee.getDescription() != null && 
+                      (fee.getDescription().toLowerCase().contains("evento") || 
+                       fee.getDescription().toLowerCase().contains("event")));
+        
+        if (hasMonthlyFees && hasEventFees) {
+            description.append(" - Cuotas mensuales y eventos");
+        } else if (hasMonthlyFees) {
+            description.append(" - Cuotas mensuales");
+        } else if (hasEventFees) {
+            description.append(" - Eventos");
+        }
+        
+        return description.toString();
+    }
+    
+    /**
+     * Get current date in Argentina timezone to avoid timezone issues
+     */
+    private String getCurrentDateInArgentina() {
+        ZoneId argentinaZone = ZoneId.of("America/Argentina/Buenos_Aires");
+        LocalDate currentDate = LocalDate.now(argentinaZone);
+        return currentDate.toString();
     }
 }

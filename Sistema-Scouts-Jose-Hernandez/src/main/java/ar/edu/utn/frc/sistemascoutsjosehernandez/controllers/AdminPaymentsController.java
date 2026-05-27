@@ -5,6 +5,7 @@ import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.PaymentStatus;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.Section;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.services.PaymentService;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.repositories.SectionRepository;
+import ar.edu.utn.frc.sistemascoutsjosehernandez.reports.service.PaymentReceiptService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -25,6 +26,7 @@ public class AdminPaymentsController {
 
     private final PaymentService paymentService;
     private final SectionRepository sectionRepository;
+    private final PaymentReceiptService paymentReceiptService;
 
     @GetMapping
     public ResponseEntity<PaymentsHistoryResponse> getAllPayments(
@@ -69,13 +71,31 @@ public class AdminPaymentsController {
 
     @GetMapping("/{paymentId}/receipt")
     public ResponseEntity<byte[]> downloadPaymentReceipt(@PathVariable Integer paymentId) {
-        byte[] receipt = paymentService.generatePaymentReceipt(paymentId);
-        
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_PDF);
-        headers.setContentDispositionFormData("attachment", "comprobante-pago-" + paymentId + ".pdf");
-        
-        return new ResponseEntity<>(receipt, headers, HttpStatus.OK);
+        try {
+            // Check if receipt can be generated
+            if (!paymentReceiptService.canGenerateReceipt(paymentId)) {
+                return ResponseEntity.notFound().build();
+            }
+
+            // Generate receipt using JasperReports
+            byte[] receipt = paymentReceiptService.generatePaymentReceipt(paymentId);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", "comprobante-pago-" + paymentId + ".pdf");
+            
+            return new ResponseEntity<>(receipt, headers, HttpStatus.OK);
+            
+        } catch (Exception e) {
+            // Fallback to old method if JasperReports fails
+            byte[] receipt = paymentService.generatePaymentReceipt(paymentId);
+            
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", "comprobante-pago-" + paymentId + ".pdf");
+            
+            return new ResponseEntity<>(receipt, headers, HttpStatus.OK);
+        }
     }
 
     @GetMapping("/statistics")

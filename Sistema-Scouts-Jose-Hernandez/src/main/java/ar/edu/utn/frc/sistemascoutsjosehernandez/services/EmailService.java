@@ -4,6 +4,7 @@ import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.User;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.events.Event;
 import ar.edu.utn.frc.sistemascoutsjosehernandez.entities.news.NewsArticle;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.scheduling.annotation.Async;
@@ -17,10 +18,13 @@ public class EmailService {
 
     @Autowired
     private JavaMailSender mailSender;
+    
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
 
     public void sendInvitation(String to, String lastName, String userType, String token) {
         String subject = "Invitación para registrarte en el grupo Scout José Hernández";
-        String link = "http://localhost:4200/registro?token=" + token;
+        String link = frontendUrl + "/registro?token=" + token;
         
         String userTypeText = "EDUCATOR".equals(userType) ? "educador/a" : "familiar";
         String greeting = "Hola " + lastName + "!";
@@ -126,7 +130,7 @@ public class EmailService {
                 "📅 Fecha de publicación: %s\n\n" +
                 "📝 Resumen:\n%s\n\n" +
                 "Puedes leer el artículo completo en:\n" +
-                "http://localhost:4200/noticias/%s\n\n" +
+                frontendUrl + "/noticias/%s\n\n" +
                 "Saludos,\nGrupo Scout José Hernández",
                 user.getLastName(),
                 article.getTitle(),
@@ -247,7 +251,7 @@ public class EmailService {
     
     public void sendPasswordResetEmail(String to, String lastName, String resetToken) {
         String subject = "Recuperación de contraseña - Grupo Scout José Hernández";
-        String resetLink = "http://localhost:4200/auth/reset-password?token=" + resetToken;
+        String resetLink = frontendUrl + "/auth/reset-password?token=" + resetToken;
         
         String text = String.format(
                 "Hola %s!\n\n" +
@@ -294,7 +298,7 @@ public class EmailService {
                 "💬 MENSAJE:\n%s\n\n" +
                 "---\n" +
                 "Para gestionar este mensaje, ingresa al panel de administración:\n" +
-                "http://localhost:4200/admin/contact\n\n" +
+                frontendUrl + "/admin/contact\n\n" +
                 "Grupo Scout José Hernández\n" +
                 "Sistema de Gestión Scout",
                 contactMessage.getName(),
